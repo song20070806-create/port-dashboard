@@ -1,0 +1,25 @@
+Period Label,Economy Label,Median time in port (days),Average container carrying capacity (TEU) per container ship
+S1   2018,United States of America,0.98,5254.0
+S1   2019,United States of America,1.0358,5364.0
+S1   2020,United States of America,1.0132,5237.0
+S1   2021,United States of America,1.2069,5503.0
+S1   2022,United States of America,1.4326,5183.0
+S1   2023,United States of America,1.0958,5580.0
+S2   2018,United States of America,1.01,5399.0
+S2   2019,United States of America,1.0125,5293.0
+S2   2020,United States of America,1.0566,5508.0
+S2   2021,United States of America,1.2958,5328.0
+S2   2022,United States of America,1.3625,5506.0
+S2   2023,United States of America,1.0674,5799.0
+S1   2018,World,0.69,3526.0
+S1   2019,World,0.6931,3525.0
+S1   2020,World,0.6861,3516.0
+S1   2021,World,0.775,3459.0
+S1   2022,World,0.8382,3407.0
+S1   2023,World,0.7028,3534.0
+S2   2018,World,0.71,3550.0
+S2   2019,World,0.691,3507.0
+S2   2020,World,0.7257,3575.0
+S2   2021,World,0.8306,3403.0
+S2   2022,World,0.7743,3432.0
+S2   2023,World,0.7139,3618.0
