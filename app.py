@@ -7,53 +7,80 @@ import plotly.express as px
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
 # ==============================================================================
-# 🎯 核心融合：位置索引資料清洗邏輯（彻底根除 KeyError 欄位名稱衝突）
+# 🎯 核心融合：智慧型關鍵字模糊對齊（完美解決 image_13e80e.png 的欄位錯位問題）
 # ==============================================================================
 @st.cache_data
 def load_and_clean_data():
-    # 讀取你的真實資料檔
     file_name = "US_PortCalls_S.csv"
-    df = pd.read_csv(file_name, index_col=0)
     
-    # 【動態防錯升級】：不管原始欄位名稱叫什麼，我們直接依據「欄位位置」強制切出最核心的 9 個欄位
-    # 這樣可以 100% 避開 CSV 檔案因為編碼、空格、斜線導致的 KeyError 欄位找不到問題
-    if df.shape[1] >= 9:
-        # 抓取前 9 個核心欄位
-        df = df.iloc[:, :9].copy()
-    else:
-        st.error(f"錯誤：資料夾內的 {file_name} 欄位數量不足 9 個，請確認 CSV 檔案是否正確！")
-        st.stop()
-        
-    # 精準強制重命名 9 大親民化欄位（此時長度絕對完美匹配 9 個）
-    df.columns = [
+    # 讀取 CSV，不強制指定 index_col，由後面邏輯動態比對
+    df = pd.read_csv(file_name)
+    
+    # 建立一個空字典來存放我們真正要的 9 個欄位
+    aligned_data = {}
+    
+    # 智慧型模糊尋找欄位（不論大小寫、空格、斜線，只要有關鍵字就抓取）
+    for col in df.columns:
+        col_lower = str(col).lower()
+        if "economy" in col_lower:
+            aligned_data['economy_label'] = df[col]
+        elif "vessel type" in col_lower:
+            aligned_data['vessel_type'] = df[col]
+        elif "average age" in col_lower and "_value" in col_lower:
+            aligned_data['avg_vessel_age'] = df[col]
+        elif "median time" in col_lower and "_value" in col_lower:
+            aligned_data['median_time_in_port'] = df[col]
+        elif "average size" in col_lower and "_value" in col_lower:
+            aligned_data['avg_size_GT'] = df[col]
+        elif "average cargo" in col_lower and "_value" in col_lower:
+            aligned_data['avg_cargo_capacity_DWT'] = df[col]
+        elif "maximum size" in col_lower and "_value" in col_lower:
+            aligned_data['max_size_GT'] = df[col]
+        elif "maximum cargo" in col_lower and "_value" in col_lower:
+            aligned_data['max_cargo_capacity_DWT'] = df[col]
+        elif "period" in col_lower:
+            aligned_data['period'] = df[col]
+
+    # 將對齊後的資料組合回新的 DataFrame
+    new_df = pd.DataFrame(aligned_data)
+    
+    # 檢查是否 9 個核心欄位都有順利抓到
+    expected_cols = [
         'economy_label', 'vessel_type', 'avg_vessel_age', 'median_time_in_port', 
         'avg_size_GT', 'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT', 'period'
     ]
     
-    # 2. 處理偽裝成文字的缺失值（對齊 Kaggle 邏輯）
+    # 如果有缺欄位，做安全備用機制（防閃退）
+    for col in expected_cols:
+        if col not in new_df.columns:
+            new_df[col] = np.nan
+
+    # 2. 處理偽裝成文字的缺失值
     placeholder = "Not available or not separately reported"
-    df.replace(placeholder, pd.NA, inplace=True)
+    new_df.replace(placeholder, pd.NA, inplace=True)
     
-    # 3. 強制將特定的數值欄位轉為純數字，避免文字干擾繪圖
+    # 3. 強制將特定的數值欄位轉為純數字
     numeric_cols = [
         'avg_vessel_age', 'median_time_in_port', 'avg_size_GT', 
         'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT'
     ]
     for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+        new_df[col] = pd.to_numeric(new_df[col], errors='coerce')
         
-    # 4. 填補中位數（對齊 Kaggle 靈魂：用該欄位的中位數補齊空缺，確保繪圖順暢）
+    # 4. 填補中位數（用該欄位的中位數補齊空缺，確保繪圖順暢）
     for col in numeric_cols:
-        median_val = df[col].median()
-        # 如果整欄都是空的導致中位數是 NaN，就補 0
+        median_val = new_df[col].median()
         if pd.isna(median_val):
             median_val = 0
-        df[col] = df[col].fillna(median_val)
+        new_df[col] = new_df[col].fillna(median_val)
     
     # 5. 修正特定文字標籤，使其在圖表上更美觀
-    df['vessel_type'] = df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
+    new_df['vessel_type'] = new_df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
     
-    return df
+    # 過濾掉那些可能因為錯位抓到純數字的髒資料
+    new_df = new_df[new_df['vessel_type'].astype(str).str.isalpha() | new_df['vessel_type'].astype(str).str.contains('_')]
+    
+    return new_df
 
 # 載入清洗完畢的乾淨資料
 df_cleaned = load_and_clean_data()
@@ -64,31 +91,34 @@ df_cleaned = load_and_clean_data()
 st.sidebar.header("📊 數據篩選中心")
 
 # 1. 年份半年度篩選（Period）
-all_periods = sorted(df_cleaned['period'].unique())
-selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=len(all_periods)-1)
+all_periods = sorted([str(x) for x in df_cleaned['period'].dropna().unique()])
+if all_periods:
+    selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=len(all_periods)-1)
+else:
+    selected_period = "無資料"
 
 # 2. 船隻類型篩選（Vessel Type）
-all_vessels = df_cleaned['vessel_type'].unique().tolist()
-selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
+all_vessels = [str(x) for x in df_cleaned['vessel_type'].dropna().unique()]
+selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels[:3] if len(all_vessels)>3 else all_vessels)
 
 # 根據篩選器過濾資料
 filtered_df = df_cleaned[
-    (df_cleaned['period'] == selected_period) & 
-    (df_cleaned['vessel_type'].isin(selected_vessels))
+    (df_cleaned['period'].astype(str) == selected_period) & 
+    (df_cleaned['vessel_type'].astype(str).isin(selected_vessels))
 ]
 
 # ==============================================================================
 # 🏛️ 前台網頁視覺化呈現
 # ==============================================================================
 st.title("⚓️ 全球海事港口績效動態儀表板")
-st.markdown(f"**當前 analysis 期間： `{selected_period}`** | 本系統融合 Kaggle 開源 EDA 資料清洗技術，實現動態港口效率分析。")
+st.markdown(f"**當前分析期間： `{selected_period}`** | 本系統融合 Kaggle 開源 EDA 資料清洗技術，實現動態港口效率分析。")
 st.write("---")
 
 # 💡 第一層：經典「各國港口效率對比折線圖」
 st.header("📈 各經濟體港口停泊時間對比")
 st.markdown("您可以透過左側篩選不同的船舶類型，觀察各國港口在該期間的綜合週轉效率。")
 
-if not filtered_df.empty:
+if not filtered_df.empty and selected_period != "無資料":
     plot_df = filtered_df.sort_values(by='median_time_in_port', ascending=False)
     
     fig_line = px.line(
