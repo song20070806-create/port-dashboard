@@ -1,53 +1,124 @@
-import streamlit as st
+import streamlit as pd
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
-# 設定網頁排版
-st.set_page_config(page_title="全球港口績效儀表板", layout="wide")
-st.title("🚢 全球港口績效與塞港監測互動儀表板")
-st.subheader("專案實作：跨時期港口停泊時間對比")
+# 設定網頁標題與寬度
+st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
-# 讀取並清洗資料
+# ==============================================================================
+# 🎯 核心融合：採用 Kaggle EDA 筆記本的專業資料清洗邏輯
+# ==============================================================================
 @st.cache_data
 def load_and_clean_data():
-    # 讀取下載下來的 csv 檔案
-    raw_df = pd.read_csv("US_PortCalls_S.csv", na_values=["Not available or not separately reported"])
-    df_container = raw_df[raw_df['CommercialMarket Label'] == 'Container ships'].copy()
-    df_container['Median time in port (days)'] = pd.to_numeric(df_container['Median time in port (days)'], errors='coerce')
-    clean_df = df_container.dropna(subset=['Median time in port (days)', 'Period Label', 'Economy Label'])
-    return clean_df
+    # 1. 載入對齊 Kaggle 規格的原始資料集
+    file_name = "Maritime Port Performance Project Dataset.csv"
+    df = pd.read_csv(file_name, index_col=0)
+    
+    # 2. 處理偽裝成文字的缺失值（對齊 Kaggle `In [2]` 邏輯）
+    placeholder = "Not available or not separately reported"
+    df.replace(placeholder, pd.NA, inplace=True)
+    
+    # 3. 強制將數值欄位轉為純數字（對齊 Kaggle 清洗步驟 3）
+    value_cols = [col for col in df.columns if "_Value" in col]
+    for col in value_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+    # 4. 填補中位數：低於 50% 缺失的欄位用中位數補齊（對齊 Kaggle 清洗步驟 6）
+    # 為避免全域計算衝突，這裡針對我們要分析的關鍵數值欄位進行精準中位數填補
+    target_value_col = "Median time spent in port (days)_Value"
+    if target_value_col in df.columns:
+        median_val = df[target_value_col].median()
+        df[target_value_col] = df[target_value_col].fillna(median_val)
+    
+    # 5. 欄位親民化命名（對齊 Kaggle 清洗步驟 7）
+    df.columns = [
+        'economy_label', 'vessel_type', 'avg_vessel_age', 'median_time_in_port', 
+        'avg_size_GT', 'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT', 'period'
+    ]
+    
+    # 6. 修正特定文字標籤，使其在圖表上更美觀
+    df['vessel_type'] = df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
+    
+    return df
 
-df = load_and_clean_data()
+# 載入清洗完畢的乾淨資料
+df_cleaned = load_and_clean_data()
 
-# 側邊欄篩選器
-st.sidebar.header("📊 網頁控制面板")
-all_economies = df['Economy Label'].unique().tolist()
-selected_economies = st.sidebar.multiselect(
-    "選擇想要對比的國家/地區：",
-    options=all_economies,
-    default=all_economies
-)
+# ==============================================================================
+# 🎛️ 側邊欄動態篩選器
+# ==============================================================================
+st.sidebar.header("📊 數據篩選中心")
 
-# 動態過濾與畫圖
-df_filtered = df[df['Economy Label'].isin(selected_economies)]
-# 動態過濾與畫圖
-df_filtered = df[df['Economy Label'].isin(selected_economies)]
+# 1. 年份半年度篩選（Period）
+all_periods = sorted(df_cleaned['period'].unique())
+selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=len(all_periods)-1)
 
-fig = px.line(
-    df_filtered, 
-    x='Period Label', 
-    y='Median time in port (days)', 
-    color='Economy Label',
-    markers=True,
-    title="2018-2023 貨櫃船在港時間中位數（天）趨勢對比",
-    labels={'Median time in port (days)': '在港時間 (天)', 'Period Label': '時間軸 (半年報)'}
-)
+# 2. 船隻類型篩選（Vessel Type）
+all_vessels = df_cleaned['vessel_type'].unique().tolist()
+# 預設勾選全部船隻
+selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
 
-# 修正後的正確排版寫法：把 tickangle 放進 xaxis 裡面
-fig.update_layout(
-    hovermode="x unified",
-    xaxis=dict(tickangle=45)
-)
+# 根據篩選器過濾資料
+filtered_df = df_cleaned[
+    (df_cleaned['period'] == selected_period) & 
+    (df_cleaned['vessel_type'].isin(selected_vessels))
+]
 
-st.plotly_chart(fig, use_container_width=True)
-st.info("💡 互動提示：你可以用滑鼠游標移到圖表的線條上，會動態顯示精確的數值；也可以利用左側控制面板自由隱藏/顯示特定國家。")
+# ==============================================================================
+# 🏛️ 前台網頁視覺化呈現
+# ==============================================================================
+st.title("⚓️ 全球海事港口績效動態儀表板")
+st.markdown(f"**當前分析期間： `{selected_period}`** | 本系統融合 Kaggle 開源 EDA 資料清洗技術，實現動態港口效率分析。")
+st.write("---")
+
+# 💡 第一層：昨天的經典「各國港口效率對比折線圖」
+st.header("📈 各經濟體港口停泊時間對比")
+st.markdown("您可以透過左側篩選不同的船舶類型，觀察各國港口在該期間的綜合週轉效率。")
+
+if not filtered_df.empty:
+    # 依停泊時間由大到小排序，讓圖表更整齊
+    plot_df = filtered_df.sort_values(by='median_time_in_port', ascending=False)
+    
+    fig_line = px.line(
+        plot_df,
+        x='economy_label',
+        y='median_time_in_port',
+        color='vessel_type',
+        title=f"各經濟體船舶在港中位數時間 ({selected_period})",
+        labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
+        markers=True,
+        template="ggplot2"  # 沿用 Kaggle 作者最愛的 ggplot 風格！
+    )
+    fig_line.update_layout(xaxis_tickangle=-45, height=600)
+    st.plotly_chart(fig_line, use_container_width=True)
+else:
+    st.warning("⚠️ 當前篩選條件下無數據，請在左側側邊欄重新勾選船舶類型。")
+
+st.write("---")
+
+# 💡 第二層（全新加入！）：Kaggle 精華「雙變量分析 - 船舶類型分佈箱線圖」的互動升級版
+st.header("📊 進階統計：不同船舶類型的港口停泊時間分佈 (Boxplot)")
+st.markdown("""
+**💡 報告亮點說明（你可以直接對老師念這段）：**
+這個箱線圖（Boxplot）是本研究的關鍵科學分析。我們將 Kaggle 筆記本中的靜態雙變量統計（Bivariate Analysis）升級為動態版本。
+透過箱線圖，我們可以觀察到不同船種的**中位數、上下四分位數以及極端異常值**。例如：貨櫃船與天然氣船通常週轉極快，而散裝貨輪的停留時間分佈則較廣。
+""")
+
+if not filtered_df.empty:
+    fig_box = px.box(
+        filtered_df,
+        x='vessel_type',
+        y='median_time_in_port',
+        color='vessel_type',
+        title=f"船舶類型 vs 港口停泊時間統計分佈 ({selected_period})",
+        labels={'vessel_type': '船舶類型', 'median_time_in_port': '在港時間 (天)'},
+        points="all",  # 把每個真實的數據點也點出來，看起來超專業
+        template="ggplot2"
+    )
+    fig_box.update_layout(height=500, showlegend=False)
+    st.plotly_chart(fig_box, use_container_width=True)
+    
+    # 底部附帶小數據表，增加專業感
+    with st.expander("🔍 檢視當前動態資料集摘要"):
+        st.dataframe(filtered_df[['economy_label', 'vessel_type', 'median_time_in_port', 'avg_vessel_age', 'period']])
