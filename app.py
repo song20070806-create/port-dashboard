@@ -7,7 +7,7 @@ import plotly.express as px
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
 # ==============================================================================
-# 🎯 核心融合：完美對齊 Kaggle 作者的 7 大資料清洗步驟 (完全修正版)
+# 🎯 核心融合：最穩定的精準資料清洗邏輯（徹底解決變數與欄位衝突）
 # ==============================================================================
 @st.cache_data
 def load_and_clean_data():
@@ -15,36 +15,51 @@ def load_and_clean_data():
     file_name = "US_PortCalls_S.csv"
     df = pd.read_csv(file_name, index_col=0)
     
-    # 步驟 1：刪除所有結尾為 '_MissingValue' 的欄位（解決 image_13e0c9.png 報錯的關鍵！）
-    missing_cols = [col for col in df.columns if "_MissingValue" in col]
-    df.drop(columns=missing_cols, inplace=True)
+    # 【超級修正案】：直接手動抓取我們需要的 9 個核心欄位，徹底繞開 Kaggle 程式碼計算缺失值的 Bug
+    # 這 9 個欄位是畫折線圖、箱線圖的所有精華
+    keep_cols = [
+        "Economy/Label",
+        "Vessel type/Label",
+        "Average age of vessels_Value",
+        "Median time spent in port (days)_Value",
+        "Average size (GT) of vessels_Value",
+        "Average cargo carrying capacity (DWT) of vessels_Value",
+        "Maximum size (GT) of vessels_Value",
+        "Maximum cargo carrying capacity (DWT) of vessels_Value",
+        "Period/Label"
+    ]
     
-    # 步驟 2：處理偽裝成文字的缺失值（對齊 Kaggle `In [2]` 邏輯）
+    # 只保留這 9 個必要的欄位
+    df = df[keep_cols].copy()
+    
+    # 2. 處理偽裝成文字的缺失值（對齊 Kaggle 邏輯）
     placeholder = "Not available or not separately reported"
     df.replace(placeholder, pd.NA, inplace=True)
     
-    # 步驟 3：強制將數值欄位轉為純數字
-    value_cols = [col for col in df.columns if "_Value" in col]
+    # 3. 強制將數值欄位轉為純數字
+    value_cols = [
+        "Average age of vessels_Value",
+        "Median time spent in port (days)_Value",
+        "Average size (GT) of vessels_Value",
+        "Average cargo carrying capacity (DWT) of vessels_Value",
+        "Maximum size (GT) of vessels_Value",
+        "Maximum cargo carrying capacity (DWT) of vessels_Value"
+    ]
     for col in value_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce')
         
-    # 步驟 6：填補低於 50% 缺失欄位的中位數（針對我們要分析的關鍵欄位精準填補）
-    target_value_cols = [
-        "Median time spent in port (days)_Value", 
-        "Average size (GT) of vessels_Value"
-    ]
-    for col in target_value_cols:
-        if col in df.columns:
-            median_val = df[col].median()
-            df[col] = df[col].fillna(median_val)
+    # 4. 填補中位數（對齊 Kaggle 精髓：用該欄位的中位數補齊空缺處）
+    for col in value_cols:
+        median_val = df[col].median()
+        df[col] = df[col].fillna(median_val)
     
-    # 步驟 7：此時欄位數量剛好完美對齊 9 個，安全進行親民化命名！
+    # 5. 精準命名 9 大親民化欄位（長度 100% 完美匹配！）
     df.columns = [
         'economy_label', 'vessel_type', 'avg_vessel_age', 'median_time_in_port', 
         'avg_size_GT', 'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT', 'period'
     ]
     
-    # 修正特定文字標籤，使其在圖表上更美觀
+    # 6. 修正特定文字標籤，使其在圖表上更美觀
     df['vessel_type'] = df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
     
     return df
@@ -78,7 +93,7 @@ st.title("⚓️ 全球海事港口績效動態儀表板")
 st.markdown(f"**當前分析期間： `{selected_period}`** | 本系統融合 Kaggle 開源 EDA 資料清洗技術，實現動態港口效率分析。")
 st.write("---")
 
-# 💡 第一層：昨天的經典「各國港口效率對比折線圖」
+# 💡 第一層：經典「各國港口效率對比折線圖」
 st.header("📈 各經濟體港口停泊時間對比")
 st.markdown("您可以透過左側篩選不同的船舶類型，觀察各國港口在該期間的綜合週轉效率。")
 
@@ -106,7 +121,6 @@ st.write("---")
 st.header("📊 進階統計：船舶類型 vs 港口核心指標分佈 (Boxplot)")
 st.markdown("這裡完美還原並升級了 Kaggle 作者針對 `median_time_in_port` 與 `avg_size_GT` 所作的雙變量箱線圖分析。")
 
-# 用頁籤把兩個原作者重視的指標切開，頁面超整潔好看！
 tab1, tab2 = st.tabs(["⏳ 在港停泊時間分佈", "🚢 船舶平均總噸位(GT)分佈"])
 
 with tab1:
