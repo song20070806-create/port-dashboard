@@ -1,9 +1,9 @@
-import streamlit as pd
+import streamlit as st  # 修正：之前手誤打成 as pd，導致 NameError
 import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# 設定網頁標題與寬度
+# 設定網頁標題與寬度 (這行現在不會報錯了！)
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
 # ==============================================================================
@@ -11,8 +11,8 @@ st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide"
 # ==============================================================================
 @st.cache_data
 def load_and_clean_data():
-    # 1. 載入對齊 Kaggle 規格的原始資料集
-    file_name = "Maritime Port Performance Project Dataset.csv"
+    # 修正：根據 image_6293fc.png 的報錯提示，對齊你 GitHub 上的真實檔名
+    file_name = "US_PortCalls_S.csv" 
     df = pd.read_csv(file_name, index_col=0)
     
     # 2. 處理偽裝成文字的缺失值（對齊 Kaggle `In [2]` 邏輯）
@@ -25,7 +25,6 @@ def load_and_clean_data():
         df[col] = pd.to_numeric(df[col], errors='coerce')
         
     # 4. 填補中位數：低於 50% 缺失的欄位用中位數補齊（對齊 Kaggle 清洗步驟 6）
-    # 為避免全域計算衝突，這裡針對我們要分析的關鍵數值欄位進行精準中位數填補
     target_value_col = "Median time spent in port (days)_Value"
     if target_value_col in df.columns:
         median_val = df[target_value_col].median()
@@ -77,7 +76,6 @@ st.header("📈 各經濟體港口停泊時間對比")
 st.markdown("您可以透過左側篩選不同的船舶類型，觀察各國港口在該期間的綜合週轉效率。")
 
 if not filtered_df.empty:
-    # 依停泊時間由大到小排序，讓圖表更整齊
     plot_df = filtered_df.sort_values(by='median_time_in_port', ascending=False)
     
     fig_line = px.line(
@@ -97,10 +95,10 @@ else:
 
 st.write("---")
 
-# 💡 第二層（全新加入！）：Kaggle 精華「雙變量分析 - 船舶類型分佈箱線圖」的互動升級版
+# 💡 第二層：Kaggle 精華「雙變量分析 - 船舶類型分佈箱線圖」的互動升級版
 st.header("📊 進階統計：不同船舶類型的港口停泊時間分佈 (Boxplot)")
 st.markdown("""
-**💡 報告亮點說明（你可以直接對老師念這段）：**
+**💡 報告亮點說明（上台報告直接念這段）：**
 這個箱線圖（Boxplot）是本研究的關鍵科學分析。我們將 Kaggle 筆記本中的靜態雙變量統計（Bivariate Analysis）升級為動態版本。
 透過箱線圖，我們可以觀察到不同船種的**中位數、上下四分位數以及極端異常值**。例如：貨櫃船與天然氣船通常週轉極快，而散裝貨輪的停留時間分佈則較廣。
 """)
