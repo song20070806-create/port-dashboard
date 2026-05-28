@@ -6,13 +6,14 @@ import plotly.express as px
 # 1. 網頁基本組態設定
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide", page_icon="⚓️")
 
-# 🌊 注入頂級海洋風（Deep Ocean）與頂部「海浪水花」動態視覺點綴
+# 🌊 注入頂級海洋風（Deep Ocean）與「頂部密集泡泡 + 底部搖曳海草與小魚」特效
 st.markdown("""
     <style>
         /* 網頁主背景：深海漸層色 */
         .stApp {
-            background: linear-gradient(180deg, #061124 0%, #0B1E36 50%, #050C1A 100%) !important;
+            background: linear-gradient(180deg, #050E1A 0%, #0B1E36 50%, #030812 100%) !important;
             color: #E2E8F0 !important;
+            position: relative;
         }
 
         /* 🌊 網頁最頂部「海浪波紋」裝飾條 */
@@ -28,51 +29,113 @@ st.markdown("""
             z-index: 999;
         }
 
-        /* 💦 自訂頂部「發光水花泡泡」特效區塊 */
+        /* 💦 頂部「多層次發光密集水花泡泡」區塊 */
         .ocean-splash-container {
             position: relative;
             width: 100%;
-            height: 60px;
+            height: 80px;
             overflow: hidden;
-            margin-bottom: -20px;
+            margin-bottom: -30px;
         }
         .splash-bubble {
             position: absolute;
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.4) 0%, rgba(14, 165, 233, 0.1) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.35) 0%, rgba(14, 165, 233, 0.05) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 50%;
-            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
             animation: floatBubble 4s ease-in-out infinite alternate;
         }
-        /* 設定不同大小位置的水花，製造錯落感 */
-        .b1 { width: 35px; height: 35px; top: 15px; left: 8%; animation-delay: 0s; }
-        .b2 { width: 20px; height: 20px; top: 5px; left: 15%; animation-delay: 0.5s; }
-        .b3 { width: 45px; height: 45px; top: -10px; left: 45%; animation-delay: 1s; }
-        .b4 { width: 25px; height: 25px; top: 20px; left: 75%; animation-delay: 0.2s; }
-        .b5 { width: 30px; height: 30px; top: 8px; left: 88%; animation-delay: 1.5s; }
+        /* 增加到 10 個錯落有致的泡泡 */
+        .b1 { width: 35px; height: 35px; top: 25px; left: 5%; animation-delay: 0s; animation-duration: 3.5s; }
+        .b2 { width: 18px; height: 18px; top: 10px; left: 12%; animation-delay: 0.5s; animation-duration: 4.5s; }
+        .b3 { width: 25px; height: 25px; top: 40px; left: 22%; animation-delay: 1.2s; animation-duration: 3s; }
+        .b4 { width: 45px; height: 45px; top: -5px; left: 38%; animation-delay: 0.8s; animation-duration: 5s; }
+        .b5 { width: 15px; height: 15px; top: 30px; left: 50%; animation-delay: 0.2s; animation-duration: 4s; }
+        .b6 { width: 30px; height: 30px; top: 15px; left: 62%; animation-delay: 1.5s; animation-duration: 3.8s; }
+        .b7 { width: 22px; height: 22px; top: 35px; left: 70%; animation-delay: 0.4s; animation-duration: 4.2s; }
+        .b8 { width: 40px; height: 40px; top: 10px; left: 80%; animation-delay: 1.1s; animation-duration: 4.8s; }
+        .b9 { width: 18px; height: 18px; top: 45px; left: 89%; animation-delay: 0.7s; animation-duration: 3.2s; }
+        .b10 { width: 28px; height: 28px; top: 5px; left: 95%; animation-delay: 1.7s; animation-duration: 5.2s; }
 
         @keyframes floatBubble {
-            0% { transform: translateY(0px) scale(1); opacity: 0.6; }
-            100% { transform: translateY(-8px) scale(1.08); opacity: 0.9; }
+            0% { transform: translateY(0px) scale(0.95); opacity: 0.5; }
+            100% { transform: translateY(-12px) scale(1.08); opacity: 0.85; }
+        }
+
+        /* 🌿 🐟 底部「搖曳海草與悠游小魚」生態區 */
+        .sea-floor-aquarium {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(to top, rgba(3, 8, 18, 0.9) 0%, rgba(11, 30, 54, 0) 100%);
+            margin-top: 40px;
+            overflow: hidden;
+            border-top: 1px solid rgba(56, 189, 248, 0.05);
         }
         
-        /* 側邊欄：深海藍加上「極光發光海岸線」邊框 */
+        /* 海草基本樣式與左右搖曳動畫 */
+        .seaweed {
+            position: absolute;
+            bottom: 0;
+            width: 8px;
+            background: linear-gradient(to top, #064E3B 0%, #059669 70%, #34D399 100%);
+            border-radius: 4px 4px 0 0;
+            opacity: 0.7;
+            transform-origin: bottom center;
+            animation: sway 3s ease-in-out infinite alternate;
+        }
+        .sw1 { height: 75px; left: 4%; animation-duration: 2.8s; }
+        .sw2 { height: 90px; left: 5%; animation-duration: 3.4s; animation-delay: 0.3s; }
+        .sw3 { height: 60px; left: 6%; animation-duration: 2.5s; animation-delay: 0.6s; }
+        
+        .sw4 { height: 80px; left: 48%; animation-duration: 3.1s; }
+        .sw5 { height: 100px; left: 49%; animation-duration: 3.6s; animation-delay: 0.4s; }
+        
+        .sw6 { height: 70px; left: 91%; animation-duration: 2.7s; }
+        .sw7 { height: 95px; left: 92%; animation-duration: 3.3s; animation-delay: 0.2s; }
+        .sw8 { height: 65px; left: 93%; animation-duration: 2.9s; animation-delay: 0.5s; }
+
+        @keyframes sway {
+            0% { transform: rotate(-5deg) skewX(-3deg); }
+            100% { transform: rotate(5deg) skewX(3deg); }
+        }
+
+        /* 游動小魚樣式 */
+        .aquarium-fish {
+            position: absolute;
+            font-size: 18px;
+            opacity: 0.8;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+            animation: swim 12s linear infinite;
+        }
+        .f1 { bottom: 45px; animation-duration: 14s; animation-delay: 0s; }
+        .f2 { bottom: 20px; animation-duration: 18s; animation-delay: 4s; }
+        .f3 { bottom: 70px; animation-duration: 11s; animation-delay: 2s; }
+
+        @keyframes swim {
+            0% { left: -5%; transform: scaleX(1); }
+            49% { transform: scaleX(1); }
+            50% { left: 105%; transform: scaleX(-1); } /* 到達右側後原地轉向 */
+            99% { transform: scaleX(-1); }
+            100% { left: -5%; transform: scaleX(1); } /* 游回左側 */
+        }
+        
+        /* 側邊欄邊框 */
         [data-testid="stSidebar"] {
             background-color: #030A16 !important;
             border-right: 2px solid #0284C7 !important;
             box-shadow: 5px 0px 15px rgba(2, 132, 199, 0.1);
         }
         
-        /* 標題與副標題：水藍色發光特效 */
+        /* 標題發光效果 */
         h1, h2, h3 {
             color: #38BDF8 !important;
             font-family: 'Helvetica Neue', sans-serif;
             font-weight: 700 !important;
             text-shadow: 0px 0px 12px rgba(56, 189, 248, 0.4);
-            letter-spacing: 0.5px;
         }
         
-        /* 表籤（Tabs）與摺疊面板樣式優化 */
+        /* 表籤（Tabs）與摺疊面板 */
         .stTabs [data-baseweb="tab-list"] {
             background-color: rgba(11, 30, 54, 0.7);
             border-radius: 10px;
@@ -89,7 +152,7 @@ st.markdown("""
             font-weight: bold !important;
         }
         
-        /* 懸浮卡片特效 */
+        /* 卡片懸浮特效 */
         div.stBlock {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -209,46 +272,39 @@ df_cleaned = load_and_clean_real_data()
 # ==============================================================================
 # 🎛️ 前端網頁介面渲染
 # ==============================================================================
-# 🌊 在標題最上方渲染出自訂的「海浪水花泡泡」區塊
+# 🌊 1. 頂部密集飛舞的「水花泡泡」群
 st.markdown("""
     <div class="ocean-splash-container">
-        <div class="splash-bubble b1"></div>
-        <div class="splash-bubble b2"></div>
-        <div class="splash-bubble b3"></div>
-        <div class="splash-bubble b4"></div>
-        <div class="splash-bubble b5"></div>
+        <div class="splash-bubble b1"></div><div class="splash-bubble b2"></div>
+        <div class="splash-bubble b3"></div><div class="splash-bubble b4"></div>
+        <div class="splash-bubble b5"></div><div class="splash-bubble b6"></div>
+        <div class="splash-bubble b7"></div><div class="splash-bubble b8"></div>
+        <div class="splash-bubble b9"></div><div class="splash-bubble b10"></div>
     </div>
 """, unsafe_allow_html=True)
 
-# 頂部海洋風標題
+# 頂部大標題
 st.title("⚓️ 全球海事港口績效動態儀表板")
 st.caption("🌊 *基於 UNCTAD 全球航運大數據，動態追蹤全球主要經濟體之港口週轉時效與運力分佈*")
 
 if df_cleaned.empty:
     st.error("⚠️ 資料集清洗後為空。")
 else:
-    # 側邊欄點綴
+    # 側邊欄航海控制中心
     st.sidebar.markdown("## ☸️ 航海控制中心")
     st.sidebar.write("---")
 
-    # 1. 選擇報告期間
     selected_period = st.sidebar.selectbox("📅 選擇報告期間 (Period)", sorted(list(df_cleaned['period'].unique())), index=0)
-    
     period_df = df_cleaned[df_cleaned['period'] == selected_period]
 
-    # 2. 選擇船舶類型
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
     selected_vessels = st.sidebar.multiselect("🚢 選擇觀測船舶類型", all_vessels, default=all_vessels)
-
-    # 3. 顯示國家數量排行滑桿
     max_countries = st.sidebar.slider("🗺️ 顯示觀測國家數量", min_value=5, max_value=30, value=12)
 
-    # 數據篩選
-    filtered_df = period_df[filtered_df['vessel_type'].isin(selected_vessels)] if 'filtered_df' in locals() else period_df[period_df['vessel_type'].isin(selected_vessels)]
+    filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
     if filtered_df.empty:
         filtered_df = period_df
 
-    # 中央主面板點綴
     col_info1, col_info2 = st.columns(2)
     with col_info1:
         st.markdown(f"🚩 **當前航行航期：** `{selected_period}`")
@@ -293,9 +349,8 @@ else:
 
     st.write("---")
 
-    # 📊 第二層：進階統計箱線圖 (Boxplot)
+    # 📊 第二層：進階統計箱線圖
     st.header("🔬 航運大數據分佈：船舶類型與核心指標")
-    
     tab1, tab2 = st.tabs(["⏳ 船舶在港停泊天數分佈 (Days)", "🚢 航行船舶平均總噸位分佈 (GT)"])
 
     with tab1:
@@ -348,3 +403,23 @@ else:
     # 原始資料摘要
     with st.expander("🔍 查看目前篩選的原始資料摘要"):
         st.dataframe(filtered_df)
+
+    # 🌿 🐟 2. 網頁最底部的「搖曳海草與悠游小魚」生態水族箱
+    st.markdown("""
+        <div class="sea-floor-aquarium">
+            <div class="seaweed sw1"></div>
+            <div class="seaweed sw2"></div>
+            <div class="seaweed sw3"></div>
+            
+            <div class="seaweed sw4"></div>
+            <div class="seaweed sw5"></div>
+            
+            <div class="seaweed sw6"></div>
+            <div class="seaweed sw7"></div>
+            <div class="seaweed sw8"></div>
+            
+            <div class="aquarium-fish f1">🐟</div>
+            <div class="aquarium-fish f2">🐠</div>
+            <div class="aquarium-fish f3">🐡</div>
+        </div>
+    """, unsafe_allow_html=True)
