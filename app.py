@@ -374,14 +374,14 @@ else:
         else:
             st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
 
-       with st.expander("🔍 查看目前篩選的原始資料摘要"):
-            st.dataframe(filtered_df)
-        st.download_button(
-            label="📥 下載本次篩選數據 (CSV)",
-            data=filtered_df.to_csv(index=False).encode('utf-8-sig'),
-            file_name='Port_Performance_Filtered.csv',
-            mime='text/csv'
-        )
+    with st.expander("🔍 查看目前篩選的原始資料摘要"):
+        st.dataframe(filtered_df)
+    st.download_button(
+        label="📥 下載本次篩選數據 (CSV)",
+        data=filtered_df.to_csv(index=False).encode('utf-8-sig'),
+        file_name='Port_Performance_Filtered.csv',
+        mime='text/csv'
+    )
     # 🌿 🐟 2. 底部「搖曳海草與悠游小魚」
     st.markdown("""
         <div class="sea-floor-aquarium">
