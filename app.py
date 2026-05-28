@@ -3,8 +3,36 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# 1. 網頁基本組態設定
+# 1. 網頁組態與自訂「海洋風 (Deep Ocean)」視覺樣式
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
+
+# 🌊 使用 CSS 注入打造「深海環境」底色與前端質感
+st.markdown("""
+    <style>
+        /* 網頁主背景與側邊欄改為高質感深海藍 */
+        .stApp {
+            background: linear-gradient(135deg, #0A192F 0%, #0F2042 100%) !important;
+            color: #E2E8F0 !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #061329 !important;
+            border-right: 1px solid #1E3A8A;
+        }
+        /* 標題與字體發光效果 */
+        h1, h2, h3 {
+            color: #38BDF8 !important;
+            text-shadow: 0px 0px 10px rgba(56, 189, 248, 0.3);
+        }
+        /* 卡片式區塊優化 */
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: rgba(15, 32, 66, 0.6);
+            border-radius: 8px;
+        }
+        p, span, label {
+            color: #94A3B8 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # 🌍 國家/經濟體中文化對照表
 COUNTRY_MAPPING = {
@@ -34,7 +62,7 @@ COUNTRY_MAPPING = {
     'Belgium': '比利時 (Belgium)'
 }
 
-# 🚢 船舶類型中文化對照表
+# 🚢 船舶類型中文化對照
 VESSEL_ZH_MAPPING = {
     'All ships': '所有船型 (All ships)',
     'Liquid bulk carriers': '液體散貨船 (Liquid bulk)',
@@ -47,8 +75,18 @@ VESSEL_ZH_MAPPING = {
     'Roll-on/roll-off ships': '滾裝船 (Ro-Ro)'
 }
 
-# 🎨 定義全局統一的彩色盤，確保所有圖表的色彩代碼完美一致
-MY_COLOR_PALETTE = px.colors.qualitative.Pastel
+# 🎨 🎯 終極修復：強制「綁定」每個船型的顏色字典，上下圖表絕對不走鐘
+COLOR_MAP = {
+    '所有船型 (All ships)': '#7DD3FC',               # 亮水藍
+    '液體散貨船 (Liquid bulk)': '#FCD34D',              # 琥珀金 (呼應你原本第一張圖的黃色)
+    '乾散貨船 (Dry bulk)': '#38BDF8',                 # 天空藍
+    '件雜貨船 (Dry breakbulk)': '#FB923C',            # 溫暖橘
+    '液化石油氣船 (LPG)': '#F472B6',                  # 霓虹粉
+    '液化天然氣船 (LNG)': '#C084FC',                  # 薰衣草紫
+    '貨櫃船 (Container)': '#6EE7B7',                 # 薄荷綠
+    '客船 (Passenger)': '#94A3B8',                  # 質感灰
+    '滾裝船 (Ro-Ro)': '#FCA5A5'                      # 珊瑚紅
+}
 
 def load_and_clean_real_data():
     file_name = "US_PortCalls_S.csv"
@@ -74,12 +112,10 @@ def load_and_clean_real_data():
         new_df['economy_label'] = raw_economy.map(COUNTRY_MAPPING).fillna(raw_economy)
         new_df['vessel_type'] = raw_vessel.map(VESSEL_ZH_MAPPING).fillna(raw_vessel)
         
-        # 安全清洗並轉換「港口停泊時間」為數值型態
         s_time = df['Median time in port (days)'].astype(str).str.replace('"', '').str.strip()
         s_time = s_time.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
         new_df['median_time_in_port'] = pd.to_numeric(s_time, errors='coerce')
         
-        # 安全清洗並轉換「船舶平均總噸位 (GT)」
         gt_cols = [c for c in df.columns if "size" in c.lower() or "gt" in c.lower()]
         if gt_cols:
             s_gt = df[gt_cols[0]].astype(str).str.replace('"', '').str.strip()
@@ -92,7 +128,6 @@ def load_and_clean_real_data():
         st.error(f"❌ 欄位解析與清洗失敗: {e}")
         return pd.DataFrame()
 
-    # 精準過濾
     new_df = new_df[~new_df['period'].str.contains('period', case=False, na=False)]
     new_df = new_df[~new_df['economy_label'].str.contains('World|total|economies', case=False, na=False)]
     new_df = new_df.dropna(subset=['median_time_in_port']).reset_index(drop=True)
@@ -104,37 +139,32 @@ df_cleaned = load_and_clean_real_data()
 # ==============================================================================
 # 🎛️ 前端網頁介面渲染
 # ==============================================================================
-st.title("⚓️ 全球海事港口績效儀表板")
+st.title("⚓️ 全球海事港口績效動態儀表板")
 
 if df_cleaned.empty:
     st.error("⚠️ 資料集清洗後為空。")
 else:
     st.sidebar.header("📊 數據篩選中心")
 
-    # 1. 選擇報告期間
     all_periods = sorted(list(df_cleaned['period'].unique()))
     selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=0)
     
     period_df = df_cleaned[df_cleaned['period'] == selected_period]
 
-    # 2. 選擇船舶類型
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
 
-    # 3. 顯示國家數量排行滑桿
-    max_countries = st.sidebar.slider("顯示國家數量 (依國家平均停泊時間排行)", min_value=5, max_value=30, value=12)
+    max_countries = st.sidebar.slider("顯示國家數量", min_value=5, max_value=30, value=12)
 
-    # 根據篩選過濾資料
     filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
-
     if filtered_df.empty:
         filtered_df = period_df
 
     st.markdown(f"**當前分析期間： `{selected_period}`**")
     st.write("---")
 
-    # 📊 第一層：各經濟體港口停泊時間對比
-    st.header("📊 各類型船隻港口停泊時間對比")
+    # 📊 第一層：長條圖
+    st.header("📊 各經濟體港口停泊時間對比")
     
     top_countries = (
         filtered_df.groupby('economy_label')['median_time_in_port']
@@ -147,7 +177,6 @@ else:
     plot_df = filtered_df[filtered_df['economy_label'].isin(top_countries)]
     plot_df = plot_df.sort_values(by='median_time_in_port', ascending=False)
     
-    # 繪製各國分組長條圖
     fig_bar = px.bar(
         plot_df,
         x='economy_label',
@@ -156,14 +185,15 @@ else:
         barmode='group',
         title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
         labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
-        template="plotly_dark",
-        color_discrete_sequence=MY_COLOR_PALETTE  # 🎯 統一調色盤
+        color_discrete_map=COLOR_MAP # 🎯 強制指定顏色對照
     )
     
     fig_bar.update_layout(
-        xaxis=dict(showspikes=False),
-        yaxis=dict(showspikes=False),
-        xaxis_tickangle=-45,
+        paper_bgcolor='rgba(0,0,0,0)', # 背景透明，融入海洋底色
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#E2E8F0'),
+        xaxis=dict(showspikes=False, tickangle=-45),
+        yaxis=dict(showspikes=False, gridcolor='rgba(255,255,255,0.05)'),
         height=550
     )
     st.plotly_chart(fig_bar, use_container_width=True)
@@ -183,10 +213,16 @@ else:
             title="不同船舶類型的港口停泊時間分佈情況",
             labels={'vessel_type': '船舶類型', 'median_time_in_port': '在港時間 (天)'},
             points="all",
-            template="plotly_dark",
-            color_discrete_sequence=MY_COLOR_PALETTE  # 🎯 核心修復：強制讓箱線圖與長條圖顏色保持完全一致
+            color_discrete_map=COLOR_MAP # 🎯 強制指定相同顏色對照，完美修正錯位！
         )
-        fig_box1.update_layout(height=500, showlegend=False)
+        fig_box1.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#E2E8F0'),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.05)'),
+            height=500, 
+            showlegend=False
+        )
         st.plotly_chart(fig_box1, use_container_width=True)
 
     with tab2:
@@ -199,10 +235,16 @@ else:
                 title="不同船舶類型的平均總噸位 (GT) 分佈情況",
                 labels={'vessel_type': '船舶類型', 'avg_size_GT': '平均總噸位 (GT)'},
                 points="all",
-                template="plotly_dark",
-                color_discrete_sequence=MY_COLOR_PALETTE  # 🎯 核心修復：強制讓噸位箱線圖顏色也保持完全一致
+                color_discrete_map=COLOR_MAP # 🎯 強制指定相同顏色對照！
             )
-            fig_box2.update_layout(height=500, showlegend=False)
+            fig_box2.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#E2E8F0'),
+                yaxis=dict(gridcolor='rgba(255,255,255,0.05)'),
+                height=500, 
+                showlegend=False
+            )
             st.plotly_chart(fig_box2, use_container_width=True)
         else:
             st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
