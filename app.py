@@ -6,7 +6,7 @@ import plotly.express as px
 # 1. 網頁基本組態設定
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide", page_icon="⚓️")
 
-# 🌊 注入頂級海洋風（Deep Ocean）進階網頁點綴與特殊 CSS
+# 🌊 注入頂級海洋風（Deep Ocean）與頂部「海浪水花」動態視覺點綴
 st.markdown("""
     <style>
         /* 網頁主背景：深海漸層色 */
@@ -14,11 +14,52 @@ st.markdown("""
             background: linear-gradient(180deg, #061124 0%, #0B1E36 50%, #050C1A 100%) !important;
             color: #E2E8F0 !important;
         }
+
+        /* 🌊 網頁最頂部「海浪波紋」裝飾條 */
+        .stApp::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 12px;
+            background: linear-gradient(90deg, #0284C7 0%, #38BDF8 50%, #0D9488 100%);
+            box-shadow: 0px 3px 20px rgba(56, 189, 248, 0.6);
+            z-index: 999;
+        }
+
+        /* 💦 自訂頂部「發光水花泡泡」特效區塊 */
+        .ocean-splash-container {
+            position: relative;
+            width: 100%;
+            height: 60px;
+            overflow: hidden;
+            margin-bottom: -20px;
+        }
+        .splash-bubble {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.4) 0%, rgba(14, 165, 233, 0.1) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+            animation: floatBubble 4s ease-in-out infinite alternate;
+        }
+        /* 設定不同大小位置的水花，製造錯落感 */
+        .b1 { width: 35px; height: 35px; top: 15px; left: 8%; animation-delay: 0s; }
+        .b2 { width: 20px; height: 20px; top: 5px; left: 15%; animation-delay: 0.5s; }
+        .b3 { width: 45px; height: 45px; top: -10px; left: 45%; animation-delay: 1s; }
+        .b4 { width: 25px; height: 25px; top: 20px; left: 75%; animation-delay: 0.2s; }
+        .b5 { width: 30px; height: 30px; top: 8px; left: 88%; animation-delay: 1.5s; }
+
+        @keyframes floatBubble {
+            0% { transform: translateY(0px) scale(1); opacity: 0.6; }
+            100% { transform: translateY(-8px) scale(1.08); opacity: 0.9; }
+        }
         
-        /* 側邊欄改為近黑色深海藍，並加上「極光發光海岸線」邊框 */
+        /* 側邊欄：深海藍加上「極光發光海岸線」邊框 */
         [data-testid="stSidebar"] {
             background-color: #030A16 !important;
-            border-right: 2px solid linear-gradient(to bottom, #0284C7, #0D9488) !important;
+            border-right: 2px solid #0284C7 !important;
             box-shadow: 5px 0px 15px rgba(2, 132, 199, 0.1);
         }
         
@@ -31,7 +72,7 @@ st.markdown("""
             letter-spacing: 0.5px;
         }
         
-        /* 表籤（Tabs）與摺疊面板樣式優化：呈現半透明潛水艇舷窗感 */
+        /* 表籤（Tabs）與摺疊面板樣式優化 */
         .stTabs [data-baseweb="tab-list"] {
             background-color: rgba(11, 30, 54, 0.7);
             border-radius: 10px;
@@ -48,7 +89,7 @@ st.markdown("""
             font-weight: bold !important;
         }
         
-        /* 懸浮卡片特效：當滑鼠移到區塊時會像海浪般微微浮起 */
+        /* 懸浮卡片特效 */
         div.stBlock {
             transition: transform 0.3s ease, box-shadow 0.3s ease;
         }
@@ -57,9 +98,8 @@ st.markdown("""
             box-shadow: 0px 8px 20px rgba(56, 189, 248, 0.1);
         }
 
-        /* 導覽小文字美化 */
         p, span, label {
-            color: #A5F3FC !important; /* 淡淡的螢光青色 */
+            color: #A5F3FC !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -107,15 +147,15 @@ VESSEL_ZH_MAPPING = {
 
 # 🎨 終極顏色綁定字典
 COLOR_MAP = {
-    '所有船型 (All ships)': '#7DD3FC',               # 亮水藍
-    '液體散貨船 (Liquid bulk)': '#FCD34D',              # 琥珀金
-    '乾散貨船 (Dry bulk)': '#38BDF8',                 # 天空藍
-    '件雜貨船 (Dry breakbulk)': '#FB923C',            # 溫暖橘
-    '液化石油氣船 (LPG)': '#F472B6',                  # 霓虹粉
-    '液化天然氣船 (LNG)': '#C084FC',                  # 薰衣草紫
-    '貨櫃船 (Container)': '#6EE7B7',                 # 薄荷綠
-    '客船 (Passenger)': '#94A3B8',                  # 質感灰
-    '滾裝船 (Ro-Ro)': '#FCA5A5'                      # 珊瑚紅
+    '所有船型 (All ships)': '#7DD3FC',               
+    '液體散貨船 (Liquid bulk)': '#FCD34D',              
+    '乾散貨船 (Dry bulk)': '#38BDF8',                 
+    '件雜貨船 (Dry breakbulk)': '#FB923C',            
+    '液化石油氣船 (LPG)': '#F472B6',                  
+    '液化天然氣船 (LNG)': '#C084FC',                  
+    '貨櫃船 (Container)': '#6EE7B7',                 
+    '客船 (Passenger)': '#94A3B8',                  
+    '滾裝船 (Ro-Ro)': '#FCA5A5'                      
 }
 
 def load_and_clean_real_data():
@@ -169,6 +209,17 @@ df_cleaned = load_and_clean_real_data()
 # ==============================================================================
 # 🎛️ 前端網頁介面渲染
 # ==============================================================================
+# 🌊 在標題最上方渲染出自訂的「海浪水花泡泡」區塊
+st.markdown("""
+    <div class="ocean-splash-container">
+        <div class="splash-bubble b1"></div>
+        <div class="splash-bubble b2"></div>
+        <div class="splash-bubble b3"></div>
+        <div class="splash-bubble b4"></div>
+        <div class="splash-bubble b5"></div>
+    </div>
+""", unsafe_allow_html=True)
+
 # 頂部海洋風標題
 st.title("⚓️ 全球海事港口績效動態儀表板")
 st.caption("🌊 *基於 UNCTAD 全球航運大數據，動態追蹤全球主要經濟體之港口週轉時效與運力分佈*")
@@ -193,7 +244,7 @@ else:
     max_countries = st.sidebar.slider("🗺️ 顯示觀測國家數量", min_value=5, max_value=30, value=12)
 
     # 數據篩選
-    filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
+    filtered_df = period_df[filtered_df['vessel_type'].isin(selected_vessels)] if 'filtered_df' in locals() else period_df[period_df['vessel_type'].isin(selected_vessels)]
     if filtered_df.empty:
         filtered_df = period_df
 
@@ -235,7 +286,7 @@ else:
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#E2E8F0'),
         xaxis=dict(showspikes=False, tickangle=-45, gridcolor='rgba(255,255,255,0.02)'),
-        yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), # 微弱的水藍色網格線
+        yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), 
         height=550
     )
     st.plotly_chart(fig_bar, use_container_width=True)
@@ -295,5 +346,5 @@ else:
             st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
 
     # 原始資料摘要
-    with st.expander("🔍 打開航海日誌：查看當前篩選的原始資料摘要"):
+    with st.expander("🔍 查看目前篩選的原始資料摘要"):
         st.dataframe(filtered_df)
