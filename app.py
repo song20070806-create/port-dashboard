@@ -318,7 +318,7 @@ else:
     if not filtered_df.empty:
         global_avg = filtered_df['median_time_in_port'].mean()
         
-        # 修正欄位名稱，根據前面清洗完的欄位應為 'economy_label' 與 'median_time_in_port'
+        # 💡 修正為清洗過後的小寫欄位名稱：economy_label 和 median_time_in_port
         country_grouped = filtered_df.groupby('economy_label')['median_time_in_port'].mean()
         worst_country = country_grouped.idxmax()
         worst_val = country_grouped.max()
