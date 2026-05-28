@@ -65,7 +65,7 @@ st.markdown("""
             100% { transform: translateY(-12px) scale(1.08); opacity: 0.85; }
         }
 
-        /* 💡 補上漏掉的科技感發光大卡片與智慧摘要樣式 */
+        /* 💡 科技感發光大卡片與智慧摘要樣式 */
         .metric-card {
             background: rgba(11, 30, 54, 0.6);
             border: 1px solid rgba(56, 189, 248, 0.3);
@@ -302,7 +302,14 @@ else:
 
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
-    max_countries = st.sidebar.slider("顯示國家數量", min_value=5, max_value=30, value=12)
+    
+    # 💡 升級：這裡把原本的 st.sidebar.slider 換成多選下拉框了！
+    all_countries = sorted(list(period_df['economy_label'].unique()))
+    selected_countries = st.sidebar.multiselect(
+        "選擇要對比的國家/經濟體", 
+        all_countries, 
+        default=all_countries
+    )
 
     filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
     if filtered_df.empty:
@@ -312,13 +319,12 @@ else:
     st.write("---")
 
     # ==============================================================================
-    # 📊 核心 KPI 快報大卡片區區（已修正縮排並放入正確的 filtered_df 判斷內）
+    # 📊 核心 KPI 快報大卡片區
     # ==============================================================================
     st.markdown("### 📊 當前篩選全域 KPI 快報")
     if not filtered_df.empty:
         global_avg = filtered_df['median_time_in_port'].mean()
         
-        # 💡 修正為清洗過後的小寫欄位名稱：economy_label 和 median_time_in_port
         country_grouped = filtered_df.groupby('economy_label')['median_time_in_port'].mean()
         worst_country = country_grouped.idxmax()
         worst_val = country_grouped.max()
@@ -334,7 +340,7 @@ else:
         with c3:
             st.markdown(f'<div class="metric-card"><div>🚨 塞港最高風險警示</div><div class="metric-val" style="color:#EF4444;">{worst_country} ({worst_val:.1f}天)</div></div>', unsafe_allow_html=True)
             
-        # 💡 自動文字摘要小助手（完美整合！）
+        # 自動文字摘要小助手
         st.markdown('<div class="insight-box">', unsafe_allow_html=True)
         st.markdown(f"#### 💡 系統智慧觀測分析提示 ({selected_period})")
         if worst_val > (global_avg * 1.5):
@@ -348,56 +354,51 @@ else:
         st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
 
     # ==============================================================================
-    # 📊 圖表呈現區（已移入正確的縮排層級）
+    # 📊 圖表呈現區
     # ==============================================================================
     if not filtered_df.empty:
         st.header("📊 各經濟體港口停泊時間對比")
         
-        top_countries = (
-            filtered_df.groupby('economy_label')['median_time_in_port']
-            .mean()
-            .sort_values(ascending=False)
-            .head(max_countries)
-            .index.tolist()
-        )
-        
-        plot_df = filtered_df[filtered_df['economy_label'].isin(top_countries)]
+        # 💡 升級：直接採用在側邊欄勾選的國家清單來繪圖
+        plot_df = filtered_df[filtered_df['economy_label'].isin(selected_countries)]
         plot_df = plot_df.sort_values(by='median_time_in_port', ascending=False)
         
-        fig_bar = px.bar(
-            plot_df,
-            x='economy_label',
-            y='median_time_in_port',
-            color='vessel_type',
-            barmode='group',
-            title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
-            labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
-            color_discrete_map=COLOR_MAP
-        )
-        
-        fig_bar.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#E2E8F0'),
-            xaxis=dict(showspikes=False, tickangle=-45, gridcolor='rgba(255,255,255,0.02)'),
-            yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), 
-            height=550
-        )
-        
-        # 📸 設定 Plotly 滑鼠移過去點相機時，下載超高畫質 16:9 簡報用圖檔
-        st.plotly_chart(
-            fig_bar, 
-            use_container_width=True,
-            config={
-                'toImageButtonOptions': {
-                    'format': 'png',
-                    'filename': '港口績效排行長條圖',
-                    'height': 720,
-                    'width': 1280,
-                    'scale': 2
+        if not plot_df.empty:
+            fig_bar = px.bar(
+                plot_df,
+                x='economy_label',
+                y='median_time_in_port',
+                color='vessel_type',
+                barmode='group',
+                title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
+                labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
+                color_discrete_map=COLOR_MAP
+            )
+            
+            fig_bar.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)', 
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#E2E8F0'),
+                xaxis=dict(showspikes=False, tickangle=-45, gridcolor='rgba(255,255,255,0.02)'),
+                yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), 
+                height=550
+            )
+            
+            st.plotly_chart(
+                fig_bar, 
+                use_container_width=True,
+                config={
+                    'toImageButtonOptions': {
+                        'format': 'png',
+                        'filename': '港口績效排行長條圖',
+                        'height': 720,
+                        'width': 1280,
+                        'scale': 2
+                    }
                 }
-            }
-        )
+            )
+        else:
+            st.info("ℹ️ 請在左側側邊欄至少勾選一個國家以顯示長條圖。")
 
         st.write("---")
 
