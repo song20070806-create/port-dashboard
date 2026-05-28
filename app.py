@@ -263,8 +263,27 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-st.title("⚓️ 全球海事港口績效動態儀表板")
-st.caption("🌊 *基於 UNCTAD 全球航運大數據，動態追蹤全球主要經濟體之港口週轉時效與運力分佈*")
+st.markdown("### 📊 當前篩選全域 KPI 快報")
+if not filtered_df.empty:
+    global_avg = filtered_df['Median time in port (days)'].mean()
+    
+    # 計算效率最好與最差的國家
+    country_grouped = filtered_df.groupby('Economy Label')['Median time in port (days)'].mean()
+    worst_country = country_grouped.idxmax()
+    worst_val = country_grouped.max()
+    best_country = country_grouped.idxmin()
+    best_val = country_grouped.min()
+    
+    # 利用 HTML 渲染出具備深海科技感的發光卡片
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(f'<div class="metric-card"><div>🌊 全球平均在港時間</div><div class="metric-val">{global_avg:.2f} 天</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'<div class="metric-card"><div>🟢 最佳轉運效率國</div><div class="metric-val" style="color:#22C55E;">{best_country} ({best_val:.1f}天)</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'<div class="metric-card"><div>🚨 塞港最高風險警示</div><div class="metric-val" style="color:#EF4444;">{worst_country} ({worst_val:.1f}天)</div></div>', unsafe_allow_html=True)
+else:
+    st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
 
 if df_cleaned.empty:
     st.error("⚠️ 資料集清洗後為空。")
