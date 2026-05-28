@@ -5,7 +5,7 @@ import plotly.express as px
 
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
-# 🚢 建立船舶代號與中英文名稱的對照表 (對應你 CSV 裡的數字)
+# 🚢 船舶代號與中英文名稱的完整對照表
 VESSEL_MAPPING = {
     '1.0': 'All ships (所有船型)',
     '1': 'All ships (所有船型)',
@@ -46,10 +46,10 @@ def load_and_clean_real_data():
         new_df['period_label'] = df['Period Label'].astype(str).str.strip()
         new_df['economy_label'] = df['Economy Label'].astype(str).str.strip()
         
-        # 🎯 讀取原始的船舶代號（去掉小數點與空白）
+        # 讀取原始的船舶代號（去掉小數點與空白）
         raw_vessel = df['CommercialMarket Label'].astype(str).str.strip()
         
-        # 🎯 核心修復：如果代號在對照表裡，就換成漂亮的文字；不在就保留原本的數字
+        # 代號轉換
         new_df['vessel_type'] = raw_vessel.map(VESSEL_MAPPING).fillna(raw_vessel)
         
         # 處理停泊時間數值
@@ -70,7 +70,7 @@ def load_and_clean_real_data():
         st.error(f"❌ 欄位解析失敗: {e}")
         return pd.DataFrame()
 
-    # 🛑 過濾雜訊與 World 總計
+    # 過濾雜訊與 World 總計
     new_df = new_df[~new_df['period'].str.contains('period', case=False, na=False)]
     new_df = new_df[~new_df['economy_label'].str.contains('World|Economy', case=False, na=False)]
     new_df = new_df.dropna(subset=['median_time_in_port']).reset_index(drop=True)
@@ -95,10 +95,10 @@ else:
     
     period_df = df_cleaned[df_cleaned['period'] == selected_period]
 
-    # 2. 選擇船舶類型 (這裡會呈現漂亮的人類文字，不再是 14.0 這種冷冰冰的數字了！)
+    # 2. 選擇船舶類型
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
     
-    # 預設幫使用者勾選前 3 個熱門船型，避免一次全部塞進去讓圖表爆炸
+    # 預設幫使用者勾選前 3 個熱門船型
     default_selection = all_vessels[:3] if len(all_vessels) >= 3 else all_vessels
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=default_selection)
 
@@ -131,10 +131,14 @@ else:
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
     
-    # 徹底關掉滑鼠移過去時的藍色十字準星對齊線
-    fig_bar.update_xaxis(showspikes=False)
-    fig_bar.update_yaxis(showspikes=False)
-    fig_bar.update_layout(xaxis_tickangle=-45, height=550)
+    # 🎯 安全修復：改用這兩行標準語法，100% 關掉十字藍線且絕對不報錯
+    fig_bar.update_layout(
+        xaxis=dict(showspikes=False),
+        yaxis=dict(showspikes=False),
+        xaxis_tickangle=-45,
+        height=550
+    )
+    
     st.plotly_chart(fig_bar, use_container_width=True)
 
     st.write("---")
