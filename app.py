@@ -45,7 +45,7 @@ st.markdown("""
             box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
             animation: floatBubble 4s ease-in-out infinite alternate;
         }
-        /* 增加到 10 個錯落有致的泡泡 */
+        /* 10 個錯落有致的泡泡 */
         .b1 { width: 35px; height: 35px; top: 25px; left: 5%; animation-delay: 0s; animation-duration: 3.5s; }
         .b2 { width: 18px; height: 18px; top: 10px; left: 12%; animation-delay: 0.5s; animation-duration: 4.5s; }
         .b3 { width: 25px; height: 25px; top: 40px; left: 22%; animation-delay: 1.2s; animation-duration: 3s; }
@@ -73,7 +73,7 @@ st.markdown("""
             border-top: 1px solid rgba(56, 189, 248, 0.05);
         }
         
-        /* 海草基本樣式與左右搖曳動畫 */
+        /* 海草樣式與左右搖曳動畫 */
         .seaweed {
             position: absolute;
             bottom: 0;
@@ -87,10 +87,8 @@ st.markdown("""
         .sw1 { height: 75px; left: 4%; animation-duration: 2.8s; }
         .sw2 { height: 90px; left: 5%; animation-duration: 3.4s; animation-delay: 0.3s; }
         .sw3 { height: 60px; left: 6%; animation-duration: 2.5s; animation-delay: 0.6s; }
-        
         .sw4 { height: 80px; left: 48%; animation-duration: 3.1s; }
         .sw5 { height: 100px; left: 49%; animation-duration: 3.6s; animation-delay: 0.4s; }
-        
         .sw6 { height: 70px; left: 91%; animation-duration: 2.7s; }
         .sw7 { height: 95px; left: 92%; animation-duration: 3.3s; animation-delay: 0.2s; }
         .sw8 { height: 65px; left: 93%; animation-duration: 2.9s; animation-delay: 0.5s; }
@@ -115,19 +113,18 @@ st.markdown("""
         @keyframes swim {
             0% { left: -5%; transform: scaleX(1); }
             49% { transform: scaleX(1); }
-            50% { left: 105%; transform: scaleX(-1); } /* 到達右側後原地轉向 */
+            50% { left: 105%; transform: scaleX(-1); }
             99% { transform: scaleX(-1); }
-            100% { left: -5%; transform: scaleX(1); } /* 游回左側 */
+            100% { left: -5%; transform: scaleX(1); }
         }
         
-        /* 側邊欄邊框 */
+        /* 側邊欄樣式 */
         [data-testid="stSidebar"] {
             background-color: #030A16 !important;
             border-right: 2px solid #0284C7 !important;
             box-shadow: 5px 0px 15px rgba(2, 132, 199, 0.1);
         }
         
-        /* 標題發光效果 */
         h1, h2, h3 {
             color: #38BDF8 !important;
             font-family: 'Helvetica Neue', sans-serif;
@@ -135,7 +132,6 @@ st.markdown("""
             text-shadow: 0px 0px 12px rgba(56, 189, 248, 0.4);
         }
         
-        /* 表籤（Tabs）與摺疊面板 */
         .stTabs [data-baseweb="tab-list"] {
             background-color: rgba(11, 30, 54, 0.7);
             border-radius: 10px;
@@ -150,15 +146,6 @@ st.markdown("""
             background-color: #0284C7 !important;
             color: #FFFFFF !important;
             font-weight: bold !important;
-        }
-        
-        /* 卡片懸浮特效 */
-        div.stBlock {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        div.stBlock:hover {
-            transform: translateY(-2px);
-            box-shadow: 0px 8px 20px rgba(56, 189, 248, 0.1);
         }
 
         p, span, label {
@@ -208,7 +195,7 @@ VESSEL_ZH_MAPPING = {
     'Roll-on/roll-off ships': '滾裝船 (Ro-Ro)'
 }
 
-# 🎨 終極顏色綁定字典
+# 🎨 顏色綁定字典
 COLOR_MAP = {
     '所有船型 (All ships)': '#7DD3FC',               
     '液體散貨船 (Liquid bulk)': '#FCD34D',              
@@ -272,7 +259,7 @@ df_cleaned = load_and_clean_real_data()
 # ==============================================================================
 # 🎛️ 前端網頁介面渲染
 # ==============================================================================
-# 🌊 1. 頂部密集飛舞的「水花泡泡」群
+# 🌊 1. 頂部密集水花泡泡群
 st.markdown("""
     <div class="ocean-splash-container">
         <div class="splash-bubble b1"></div><div class="splash-bubble b2"></div>
@@ -283,23 +270,21 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 頂部大標題
 st.title("⚓️ 全球海事港口績效動態儀表板")
 st.caption("🌊 *基於 UNCTAD 全球航運大數據，動態追蹤全球主要經濟體之港口週轉時效與運力分佈*")
 
 if df_cleaned.empty:
     st.error("⚠️ 資料集清洗後為空。")
 else:
-    # 側邊欄航海控制中心
-    st.sidebar.markdown("## ☸️ 航海控制中心")
+    st.sidebar.markdown("## ☸️ 數據篩選中心")
     st.sidebar.write("---")
 
-    selected_period = st.sidebar.selectbox("📅 選擇報告期間 (Period)", sorted(list(df_cleaned['period'].unique())), index=0)
+    selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", sorted(list(df_cleaned['period'].unique())), index=0)
     period_df = df_cleaned[df_cleaned['period'] == selected_period]
 
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
-    selected_vessels = st.sidebar.multiselect("🚢 選擇觀測船舶類型", all_vessels, default=all_vessels)
-    max_countries = st.sidebar.slider("🗺️ 顯示觀測國家數量", min_value=5, max_value=30, value=12)
+    selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
+    max_countries = st.sidebar.slider("顯示國家數量 (依國家平均停泊時間排行)", min_value=5, max_value=30, value=12)
 
     filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
     if filtered_df.empty:
@@ -307,9 +292,7 @@ else:
 
     col_info1, col_info2 = st.columns(2)
     with col_info1:
-        st.markdown(f"🚩 **當前航行航期：** `{selected_period}`")
-    with col_info2:
-        st.markdown(f"🔮 **當前監測船群：** 已鎖定 `{len(selected_vessels)}` 種核心船型")
+        st.markdown(f"🚩 **當前分析期間：** `{selected_period}`")
     st.write("---")
 
     # 📊 第一層：長條圖
@@ -332,11 +315,12 @@ else:
         y='median_time_in_port',
         color='vessel_type',
         barmode='group',
-        title=f"各經濟體船舶在港中位數時間排行 (半年度航期: {selected_period})",
-        labels={'economy_label': '經濟體 / 觀測國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
+        title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
+        labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
         color_discrete_map=COLOR_MAP
     )
     
+    # 🌟 這裡修正了錯誤，使用雙向字典同時將 showspikes 設定寫入
     fig_bar.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', 
         plot_bgcolor='rgba(0,0,0,0)',
@@ -400,24 +384,15 @@ else:
         else:
             st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
 
-    # 原始資料摘要
     with st.expander("🔍 查看目前篩選的原始資料摘要"):
         st.dataframe(filtered_df)
 
-    # 🌿 🐟 2. 網頁最底部的「搖曳海草與悠游小魚」生態水族箱
+    # 🌿 🐟 2. 底部「搖曳海草與悠游小魚」
     st.markdown("""
         <div class="sea-floor-aquarium">
-            <div class="seaweed sw1"></div>
-            <div class="seaweed sw2"></div>
-            <div class="seaweed sw3"></div>
-            
-            <div class="seaweed sw4"></div>
-            <div class="seaweed sw5"></div>
-            
-            <div class="seaweed sw6"></div>
-            <div class="seaweed sw7"></div>
-            <div class="seaweed sw8"></div>
-            
+            <div class="seaweed sw1"></div><div class="seaweed sw2"></div><div class="seaweed sw3"></div>
+            <div class="seaweed sw4"></div><div class="seaweed sw5"></div>
+            <div class="seaweed sw6"></div><div class="seaweed sw7"></div><div class="seaweed sw8"></div>
             <div class="aquarium-fish f1">🐟</div>
             <div class="aquarium-fish f2">🐠</div>
             <div class="aquarium-fish f3">🐡</div>
