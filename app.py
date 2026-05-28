@@ -7,105 +7,152 @@ import plotly.express as px
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
 # ==============================================================================
-# 🎯 核心功能：地毯式清除文字雙引號，強制還原真實數字！
+# 🎯 終極智慧清洗：用關鍵字「盲抓」真正需要的欄位
 # ==============================================================================
 @st.cache_data
 def load_and_clean_data():
     file_name = "US_PortCalls_S.csv"
     try:
-        df = pd.read_csv(file_name)
+        # 自動忽略可能導致解析錯誤的爛行
+        df = pd.read_csv(file_name, on_bad_lines='skip')
     except Exception as e:
         st.error(f"❌ 無法讀取 CSV 檔案：{e}")
         return pd.DataFrame()
 
-    # 剔除未命名的流水號欄位
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    # 清除欄位前後的隱形空格，全部轉小寫方便比對
+    df.columns = df.columns.str.strip()
+    col_raw = df.columns.tolist()
+    col_low = [c.lower() for c in col_raw]
     
-    # 建立乾淨的 DataFrame
     new_df = pd.DataFrame()
-    
-    # 1. 抓取文字維度，並強制清除內文可能包著的雙引號
-    new_df['economy_label'] = df.iloc[:, 0].astype(str).str.replace('"', '').str.strip()
-    new_df['vessel_type'] = df.iloc[:, 1].astype(str).str.replace('"', '').str.strip()
-    
-    if df.shape[1] >= 9:
-        new_df['period'] = df.iloc[:, 8].astype(str).str.replace('"', '').str.strip()
-    else:
-        new_df['period'] = df.iloc[:, -1].astype(str).str.replace('"', '').str.strip()
 
-    # 2. 定義六大數值指標
-    target_numeric_names = [
-        'avg_vessel_age', 'median_time_in_port', 'avg_size_GT', 
-        'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT'
-    ]
-    
-    for i, target_name in enumerate(target_numeric_names):
-        col_idx = 2 + i
-        if col_idx < df.shape[1]:
-            # 💡 關鍵修復：先把文字轉成 String，再徹底拔掉前後的雙引號 '"'，這樣 pd.to_numeric 才能順利認出數字！
-            s = df.iloc[:, col_idx].astype(str).str.replace('"', '').str.strip()
-            # 排除 Kaggle 原始缺值文字
-            s = s.replace("Not available or not separately reported", pd.NA)
-            new_df[target_name] = pd.to_numeric(s, errors='coerce')
-        else:
-            new_df[target_name] = np.nan
+    # 1. 尋找「經濟體/國家文字描述」欄位
+    # 優先找同時包含 economy 和 label 的，或是包含 country, name, label 的文字欄
+    eco_col = None
+    for i, cl in enumerate(col_low):
+        if "economy" in cl and "label" in cl:
+            eco_col = col_raw[i]
+            break
+    if not eco_col:
+        for i, cl in enumerate(col_low):
+            if "label" in cl or "country" in cl or "economy" in cl:
+                # 排除純數字的 code 欄位
+                if "code" not in cl:
+                    eco_col = col_raw[i]
+                    break
+    # 真的找不到就用第一欄
+    new_df['economy_label'] = df[eco_col] if eco_col else df.iloc[:, 0]
 
-    # 3. 填補中位數（這回絕對能抓到真正有高低起伏的中位數了！）
-    for col in target_numeric_names:
-        median_val = new_df[col].median()
-        if pd.isna(median_val):
-            # 萬一還是空的，給予安全的基礎底標
-            median_val = 1.2 if 'time' in col or 'age' in col else 1000.0
-        new_df[col] = new_df[col].fillna(median_val)
-        
-    # 文字標籤美化
-    new_df['vessel_type'] = new_df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
+    # 2. 尋找「船舶類型描述」欄位
+    vess_col = None
+    for i, cl in enumerate(col_low):
+        if "vessel" in cl and "label" in cl:
+            vess_col = col_raw[i]
+            break
+    if not vess_col:
+        for i, cl in enumerate(col_low):
+            if "vessel" in cl or "ship" in cl:
+                if "code" not in cl:
+                    vess_col = col_raw[i]
+                    break
+    new_df['vessel_type'] = df[vess_col] if vess_col else df.iloc[:, 1]
+
+    # 3. 尋找「時間期間」欄位
+    per_col = None
+    for i, cl in enumerate(col_low):
+        if "period" in cl or "year" in cl or "date" in cl:
+            per_col = col_raw[i]
+            break
+    new_df['period'] = df[per_col] if per_col else (df.iloc[:, 8] if df.shape[1] >= 9 else df.iloc[:, -1])
+
+    # 4. 尋找「在港停泊時間 (數值)」欄位
+    time_col = None
+    for i, cl in enumerate(col_low):
+        if "time" in cl or "spent" in cl or "days" in cl:
+            if "value" in cl or "median" in cl or "avg" in cl or "average" in cl:
+                time_col = col_raw[i]
+                break
+    if not time_col:
+        for i, cl in enumerate(col_low):
+            if "time" in cl or "port" in cl:
+                time_col = col_raw[i]
+                break
     
-    # 移除夾雜在內文中的標題列雜訊
-    new_df = new_df[~new_df['period'].str.contains('Period', case=False, na=False)]
-    new_df = new_df[~new_df['economy_label'].str.contains('Economy', case=False, na=False)]
+    # 5. 尋找「船舶大小/噸位 (數值)」欄位
+    size_col = None
+    for i, cl in enumerate(col_low):
+        if "size" in cl or "gt" in cl or "tonnage" in cl:
+            size_col = col_raw[i]
+            break
+
+    # 數值轉換與雙引號拔除
+    def clean_to_numeric(series):
+        s = series.astype(str).str.replace('"', '').str.replace("'", "").str.strip()
+        s = s.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
+        return pd.to_numeric(s, errors='coerce')
+
+    new_df['median_time_in_port'] = clean_to_numeric(df[time_col]) if time_col else clean_to_numeric(df.iloc[:, 3])
+    new_df['avg_size_GT'] = clean_to_numeric(df[size_col]) if size_col else clean_to_numeric(df.iloc[:, 4])
+
+    # 基礎文字清洗
+    new_df['economy_label'] = new_df['economy_label'].astype(str).str.replace('"', '').str.strip()
+    new_df['vessel_type'] = new_df['vessel_type'].astype(str).str.replace('"', '').str.strip()
+    new_df['period'] = new_df['period'].astype(str).str.replace('"', '').str.strip()
+
+    # 剔除表格內的雜訊行（例如把欄位名稱重複當成資料列的狀況）
+    mask = (
+        (~new_df['period'].str.contains('Period|Label', case=False, na=False)) & 
+        (~new_df['economy_label'].str.contains('Economy|Country|Code', case=False, na=False)) &
+        (new_df['median_time_in_port'].notna()) # 確保時間有值，不抓垃圾空行
+    )
+    new_df = new_df[mask].reset_index(drop=True)
     
     return new_df
 
 df_cleaned = load_and_clean_data()
 
 # ==============================================================================
-# 🎛️ 前端網頁渲染與側邊欄
+# 🎛️ 前端網頁渲染
 # ==============================================================================
 if df_cleaned.empty:
-    st.error("⚠️ 資料載入失敗，表格為空。")
+    st.error("⚠️ 無法成功解析任何有效的海事數據，請展開下方檢查原始欄位名稱。")
+    # 顯示欄位偵測幫助除錯
+    try:
+        raw_df = pd.read_csv("US_PortCalls_S.csv", nrows=5)
+        st.write("原始 CSV 欄位名稱如下，請檢查是否對應：", raw_df.columns.tolist())
+        st.dataframe(raw_df)
+    except:
+        pass
 else:
     st.sidebar.header("📊 數據篩選中心")
 
     # 1. 期間篩選器
-    all_periods = sorted(list(df_cleaned['period'].unique()))
-    selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=len(all_periods)-1 if all_periods else 0)
+    all_periods = sorted([x for x in df_cleaned['period'].unique() if x not in ["nan", "Unknown", ""]])
+    if all_periods:
+        selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=len(all_periods)-1)
+        filtered_df = df_cleaned[df_cleaned['period'] == selected_period]
+    else:
+        selected_period = "所有期間"
+        filtered_df = df_cleaned.copy()
 
     # 2. 船舶類型篩選器
-    all_vessels = sorted(list(df_cleaned['vessel_type'].unique()))
-    default_vessels = [v for v in ["All_Vessel_Types", "Container ships", "Liquid bulk carriers"] if v in all_vessels]
-    if not default_vessels:
-        default_vessels = all_vessels[:2] if all_vessels else []
-    selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=default_vessels)
+    all_vessels = sorted([x for x in filtered_df['vessel_type'].unique() if x not in ["nan", ""]])
+    if all_vessels:
+        # 儘量勾選多一點，免得漏看
+        default_vessels = [v for v in all_vessels if "all" in v.lower() or "container" in v.lower()]
+        if not default_vessels:
+            default_vessels = all_vessels
+        selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=default_vessels)
+        filtered_df = filtered_df[filtered_df['vessel_type'].isin(selected_vessels)]
+    else:
+        st.sidebar.warning("當前期間無可用船型描述")
 
-    # 3. 限制顯示的國家數量
+    # 3. 顯示國家數量
     max_countries = st.sidebar.slider("畫面上顯示前幾名效率排行國家", min_value=5, max_value=40, value=15)
-
-    # 動態過濾資料
-    filtered_df = df_cleaned[
-        (df_cleaned['period'] == selected_period) & 
-        (df_cleaned['vessel_type'].isin(selected_vessels))
-    ]
-
-    # 保險安全閥：若過濾完是空的，直接不過濾時間，避免畫面開天窗
-    if filtered_df.empty:
-        filtered_df = df_cleaned[df_cleaned['vessel_type'].isin(selected_vessels)]
-    if filtered_df.empty:
-        filtered_df = df_cleaned
 
     # --- 主網頁畫面 ---
     st.title("⚓️ 全球海事港口績效動態儀表板")
-    st.markdown(f"**當前分析期間： `{selected_period}`** | 系統已成功解析並清洗被雙引號鎖定的數據。")
+    st.markdown(f"**當前分析期間： `{selected_period}`** | 智慧關鍵字搜尋技術已啟動。")
     st.write("---")
 
     # 💡 第一層：折線圖
@@ -127,7 +174,7 @@ else:
         fig_line.update_layout(xaxis_tickangle=-45, height=600)
         st.plotly_chart(fig_line, use_container_width=True)
     else:
-        st.warning("⚠️ 圖表無資料可供渲染。")
+        st.warning("⚠️ 此篩選條件下沒有對應數據。")
 
     st.write("---")
 
@@ -148,7 +195,7 @@ else:
                 points="all",
                 template="ggplot2"
             )
-            fig_box1.update_layout(height=500, showlegend=False)
+            fig_box1.update_layout(height=500, showlegend=False, xaxis_tickangle=-25)
             st.plotly_chart(fig_box1, use_container_width=True)
 
     with tab2:
@@ -163,7 +210,7 @@ else:
                 points="all",
                 template="ggplot2"
             )
-            fig_box2.update_layout(height=500, showlegend=False)
+            fig_box2.update_layout(height=500, showlegend=False, xaxis_tickangle=-25)
             st.plotly_chart(fig_box2, use_container_width=True)
 
     # 底部數據檢查器
