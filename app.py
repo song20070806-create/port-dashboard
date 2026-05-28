@@ -10,45 +10,51 @@ st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide"
 def load_and_clean_data():
     file_name = "US_PortCalls_S.csv"
     try:
-        df = pd.read_csv(file_name)
+        # 使用 utf-8-sig 讀取，自動消滅可能存在的隱形 BOM 碼
+        df = pd.read_csv(file_name, encoding='utf-8-sig')
     except Exception as e:
         st.error(f"❌ 無法讀取 CSV 檔案：{e}")
         return pd.DataFrame()
 
-    # 確保拔除欄位名稱前後的隱形空格
-    df.columns = df.columns.str.strip()
-    
+    if df.empty:
+        return pd.DataFrame()
+
     new_df = pd.DataFrame()
     
-    # 精準對應官方欄位
-    new_df['economy_label'] = df['Economy_Label'].astype(str).str.strip()
-    new_df['vessel_type'] = df['CommercialMarket_Label'].astype(str).str.strip()
-    new_df['period'] = df['period'].astype(str).str.strip()
+    # 🔥 終極大絕招：完全不用欄位名稱，直接用「欄位位置 (iloc)」強行抓取！
+    # 這樣管他 CSV 裡面欄位叫什麼名字、有沒有空格，都不可能噴 KeyError 報錯。
+    try:
+        # 第 1 欄 (Index 0): 國家
+        new_df['economy_label'] = df.iloc[:, 0].astype(str).str.replace('"', '').str.strip()
+        
+        # 第 2 欄 (Index 1): 船舶類型文字
+        new_df['vessel_type'] = df.iloc[:, 1].astype(str).str.replace('"', '').str.strip()
+        
+        # 第 6 欄 (Index 5): 港口停泊時間中位數
+        new_df['median_time_in_port'] = df.iloc[:, 5].astype(str).str.replace('"', '').str.strip()
+        
+        # 第 8 欄 (Index 7): 船舶平均總噸位
+        new_df['avg_size_GT'] = df.iloc[:, 7].astype(str).str.replace('"', '').str.strip()
+        
+        # 最後一欄 (Index -1): 期間 period
+        new_df['period'] = df.iloc[:, -1].astype(str).str.replace('"', '').str.strip()
+    except Exception as e:
+        st.error(f"❌ 擷取欄位位置時出錯，請確認 CSV 欄位數量是否足夠：{e}")
+        return pd.DataFrame()
 
     # 安全轉換數值函數
     def to_numeric_clean(series):
-        s = series.astype(str).str.replace('"', '').str.strip()
-        s = s.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
+        s = series.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
         return pd.to_numeric(s, errors='coerce')
 
-    # 讀取數值欄位
-    if 'Median_time_in_port_days_Value' in df.columns:
-        new_df['median_time_in_port'] = to_numeric_clean(df['Median_time_in_port_days_Value'])
-    else:
-        time_cols = [c for c in df.columns if "time_in_port" in c.lower()]
-        new_df['median_time_in_port'] = to_numeric_clean(df[time_cols[0]]) if time_cols else to_numeric_clean(df.iloc[:, 5])
+    new_df['median_time_in_port'] = to_numeric_clean(new_df['median_time_in_port'])
+    new_df['avg_size_GT'] = to_numeric_clean(new_df['avg_size_GT'])
 
-    if 'Average_size_GT_Value' in df.columns:
-        new_df['avg_size_GT'] = to_numeric_clean(df['Average_size_GT_Value'])
-    else:
-        size_cols = [c for c in df.columns if "size_gt" in c.lower()]
-        new_df['avg_size_GT'] = to_numeric_clean(df[size_cols[0]]) if size_cols else to_numeric_clean(df.iloc[:, 7])
-
-    # 資料清洗：移除重複的標題列與 World 總計
+    # 資料過濾：移除重複的標題列雜訊、空白值與 World 總計
     new_df = new_df[~new_df['period'].str.contains('period', case=False, na=False)]
     new_df = new_df[~new_df['economy_label'].str.contains('Economy|World', case=False, na=False)]
     
-    # 剔除時間或船型為空值的行
+    # 剔除停泊時間為空值的資料
     new_df = new_df.dropna(subset=['median_time_in_port']).reset_index(drop=True)
     
     return new_df
@@ -59,7 +65,7 @@ df_cleaned = load_and_clean_data()
 # 🎛️ 前端網頁渲染
 # ==============================================================================
 if df_cleaned.empty:
-    st.error("⚠️ 資料集清洗後為空，請檢查 CSV 檔案欄位。")
+    st.error("⚠️ 資料集清洗後為空。請確保 CSV 檔案與 app.py 放再同一個資料夾。")
 else:
     st.sidebar.header("📊 數據篩選中心")
 
@@ -67,17 +73,14 @@ else:
     all_periods = sorted(list(df_cleaned['period'].unique()))
     selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=0)
 
-    # 先切出該期間的資料
     period_df = df_cleaned[df_cleaned['period'] == selected_period]
 
-    # 2. 船舶類型篩選器
+    # 2. 船舶類型篩選器（預設直接全選，確保一定看得到圖表）
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
-    
-    # 🔥 修正點：預設直接勾選「全部可用船型」，避免因為漏勾導致畫面空白
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
 
     # 3. 限制顯示國家數
-    max_countries = st.sidebar.slider("顯示國家數量", min_value=5, max_value=40, value=15)
+    max_countries = st.sidebar.slider("顯示國家數量 (依停泊時間排行)", min_value=5, max_value=40, value=15)
 
     # 最終過濾資料
     filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
@@ -87,7 +90,7 @@ else:
     st.markdown(f"**當前分析期間： `{selected_period}`**")
     st.write("---")
 
-    # 💡 第一層：分組長條圖
+    # 💡 第一層：美化版分組長條圖
     st.header("📊 各經濟體港口停泊時間對比")
     
     if not filtered_df.empty:
@@ -106,14 +109,11 @@ else:
         fig_bar.update_layout(xaxis_tickangle=-45, height=550)
         st.plotly_chart(fig_bar, use_container_width=True)
     else:
-        # 🔥 除錯機制：如果還是空的，直接把原因印在畫面上給我們看
-        st.error(f"❌ 警告：在 `{selected_period}` 期間內找不到選定船型的資料！")
-        st.write("請檢查下方目前該期間內實際存在的資料型態：")
-        st.write(period_df.head(10))
+        st.warning("⚠️ 當前篩選條件下無資料，請在左側側邊欄重新勾選船舶類型。")
 
     st.write("---")
 
-    # 💡 第二層：統計箱線圖 (Boxplot)
+    # 💡 第二層：雙指標統計箱線圖
     st.header("📊 進階統計：船舶類型與核心指標分佈 (Boxplot)")
     
     if not filtered_df.empty:
