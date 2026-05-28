@@ -1,217 +1,390 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import numpy as np
+import plotly.express as px
 
-# 1. 網頁基本設定 (必須在第一行)
-st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
+# 1. 網頁基本組態設定
+st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide", page_icon="⚓️")
 
-# 2. 載入並清洗資料 (這裡對應你原本的真實數據集，若檔名不同請自行修改)
-@st.cache_data
-def load_and_clean_data():
-    try:
-        # 讀取 UNCTAD 原始數據
-        df = pd.read_csv("US_PortCalls_S.csv")
-        
-        # 資料清洗：剔除全域非國家雜訊，並轉換型態
-        df = df[~df['Economy Label'].isin(['World', 'Total', 'Developing economies', 'Developed economies'])]
-        df['Median time in port (days)'] = pd.to_numeric(df['Median time in port (days)'], errors='coerce')
-        df = df.dropna(subset=['Median time in port (days)'])
-        
-        # 去除字串前後空白
-        df['CommercialMarket Label'] = df['CommercialMarket Label'].str.strip()
-        df['Economy Label'] = df['Economy Label'].str.strip()
-        return df
-    except:
-        # 萬一讀取失敗，建立一組備用模擬數據確保網頁不崩潰
-        periods = ['2018S02', '2019S01', '2019S02', '2020S01']
-        countries = ['Philippines', 'Italy', 'Indonesia', 'France', 'Japan', 'United States']
-        ships = ['Dry bulk carriers', 'Container ships', 'Liquid bulk carriers', 'Gas carriers']
-        
-        data = []
-        for p in periods:
-            for c in countries:
-                for s in ships:
-                    # 故意讓菲律賓的乾散貨船天數極高 (4.5天)，模擬真實塞港歷史數據
-                    val = 4.5 if c == 'Philippines' and s == 'Dry bulk carriers' else np.random.uniform(0.5, 2.0)
-                    data.append({
-                        "Period Label": p,
-                        "Economy Label": c,
-                        "CommercialMarket Label": s,
-                        "Median time in port (days)": val,
-                        "Average size GT": np.random.randint(10000, 50000)
-                    })
-        return pd.DataFrame(data)
-
-df_clean = load_and_clean_data()
-
-# 3. 注入沉浸式深海藍 CSS 網頁美化樣式 (包含你自豪的頂部氣泡與底部小魚特效)
+# 🌊 安全溫和版海洋風 CSS：防止全局衝突變黑
 st.markdown("""
-<style>
-    /* 全局深海背景與文字顏色設定 */
-    .stApp {
-        background: linear-gradient(180deg, #050E1A 0%, #030812 100%);
-        color: #E2E8F0;
-    }
-    
-    /* 頂部發光海岸線裝飾條 */
-    .coastline {
-        height: 6px;
-        background: linear-gradient(90deg, #38BDF8, #0D9488);
-        position: fixed;
-        top: 0; left: 0; width: 100%; z-index: 9999;
-    }
-    
-    /* 科技感發光大卡片樣式 */
-    .metric-card {
-        background: rgba(11, 30, 54, 0.6);
-        border: 1px solid rgba(56, 189, 248, 0.3);
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(56, 189, 248, 0.1);
-        backdrop-filter: blur(5px);
-    }
-    .metric-val {
-        font-size: 28px;
-        font-weight: bold;
-        color: #38BDF8;
-        margin-top: 5px;
-    }
-    
-    /* 智慧摘要佈告欄樣式 */
-    .insight-box {
-        background: rgba(13, 148, 136, 0.15);
-        border-left: 5px solid #0D9488;
-        border-radius: 4px;
-        padding: 15px;
-        margin: 20px 0;
-    }
-</style>
-<div class="coastline"></div>
+    <style>
+        /* 溫和設定主背景，移除不必要的全局文字強制覆蓋 */
+        .stApp {
+            background: linear-gradient(180deg, #050E1A 0%, #0B1E36 50%, #030812 100%) !important;
+        }
+
+        /* 確保基本文字顏色在深色背景下清晰可見 */
+        .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3 {
+            color: #E2E8F0 !important;
+        }
+
+        /* 🌊 網頁最頂部「海浪波紋」裝飾條 */
+        .stApp::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 12px;
+            background: linear-gradient(90deg, #0284C7 0%, #38BDF8 50%, #0D9488 100%);
+            box-shadow: 0px 3px 20px rgba(56, 189, 248, 0.6);
+            z-index: 999;
+        }
+
+        /* 💦 頂部「多層次發光密集水花泡泡」區塊 */
+        .ocean-splash-container {
+            position: relative;
+            width: 100%;
+            height: 80px;
+            overflow: hidden;
+            margin-bottom: -10px;
+        }
+        .splash-bubble {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.35) 0%, rgba(14, 165, 233, 0.05) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+            animation: floatBubble 4s ease-in-out infinite alternate;
+        }
+        /* 10 個錯落有致的泡泡 */
+        .b1 { width: 35px; height: 35px; top: 25px; left: 5%; animation-delay: 0s; animation-duration: 3.5s; }
+        .b2 { width: 18px; height: 18px; top: 10px; left: 12%; animation-delay: 0.5s; animation-duration: 4.5s; }
+        .b3 { width: 25px; height: 25px; top: 40px; left: 22%; animation-delay: 1.2s; animation-duration: 3s; }
+        .b4 { width: 45px; height: 45px; top: -5px; left: 38%; animation-delay: 0.8s; animation-duration: 5s; }
+        .b5 { width: 15px; height: 15px; top: 30px; left: 50%; animation-delay: 0.2s; animation-duration: 4s; }
+        .b6 { width: 30px; height: 30px; top: 15px; left: 62%; animation-delay: 1.5s; animation-duration: 3.8s; }
+        .b7 { width: 22px; height: 22px; top: 35px; left: 70%; animation-delay: 0.4s; animation-duration: 4.2s; }
+        .b8 { width: 40px; height: 40px; top: 10px; left: 80%; animation-delay: 1.1s; animation-duration: 4.8s; }
+        .b9 { width: 18px; height: 18px; top: 45px; left: 89%; animation-delay: 0.7s; animation-duration: 3.2s; }
+        .b10 { width: 28px; height: 28px; top: 5px; left: 95%; animation-delay: 1.7s; animation-duration: 5.2s; }
+
+        @keyframes floatBubble {
+            0% { transform: translateY(0px) scale(0.95); opacity: 0.5; }
+            100% { transform: translateY(-12px) scale(1.08); opacity: 0.85; }
+        }
+
+        /* 🌿 🐟 底部「搖曳海草與悠游小魚」生態區 */
+        .sea-floor-aquarium {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(to top, rgba(3, 8, 18, 0.9) 0%, rgba(11, 30, 54, 0) 100%);
+            margin-top: 40px;
+            overflow: hidden;
+            border-top: 1px solid rgba(56, 189, 248, 0.1);
+        }
+        
+        /* 海草樣式與左右搖曳動畫 */
+        .seaweed {
+            position: absolute;
+            bottom: 0;
+            width: 8px;
+            background: linear-gradient(to top, #064E3B 0%, #059669 70%, #34D399 100%);
+            border-radius: 4px 4px 0 0;
+            opacity: 0.7;
+            transform-origin: bottom center;
+            animation: sway 3s ease-in-out infinite alternate;
+        }
+        .sw1 { height: 75px; left: 4%; animation-duration: 2.8s; }
+        .sw2 { height: 90px; left: 5%; animation-duration: 3.4s; animation-delay: 0.3s; }
+        .sw3 { height: 60px; left: 6%; animation-duration: 2.5s; animation-delay: 0.6s; }
+        .sw4 { height: 80px; left: 48%; animation-duration: 3.1s; }
+        .sw5 { height: 100px; left: 49%; animation-duration: 3.6s; animation-delay: 0.4s; }
+        .sw6 { height: 70px; left: 91%; animation-duration: 2.7s; }
+        .sw7 { height: 95px; left: 92%; animation-duration: 3.3s; animation-delay: 0.2s; }
+        .sw8 { height: 65px; left: 93%; animation-duration: 2.9s; animation-delay: 0.5s; }
+
+        @keyframes sway {
+            0% { transform: rotate(-5deg) skewX(-3deg); }
+            100% { transform: rotate(5deg) skewX(3deg); }
+        }
+
+        /* 游動小魚樣式 */
+        .aquarium-fish {
+            position: absolute;
+            font-size: 20px;
+            opacity: 0.95;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+            animation: swim 14s linear infinite;
+        }
+        .f1 { bottom: 45px; animation-duration: 14s; animation-delay: 0s; }
+        .f2 { bottom: 20px; animation-duration: 18s; animation-delay: 4s; }
+        .f3 { bottom: 70px; animation-duration: 11s; animation-delay: 2s; }
+
+        @keyframes swim {
+            0% { left: -5%; transform: scaleX(1); }
+            49% { transform: scaleX(1); }
+            50% { left: 105%; transform: scaleX(-1); }
+            99% { transform: scaleX(-1); }
+            100% { left: -5%; transform: scaleX(1); }
+        }
+        
+        /* 側邊欄樣式優化 */
+        [data-testid="stSidebar"] {
+            background-color: #030A16 !important;
+            border-right: 2px solid #0284C7 !important;
+        }
+        
+        /* 讓標題顏色獨立發光 */
+        .stApp h1 {
+            color: #38BDF8 !important;
+            text-shadow: 0px 0px 12px rgba(56, 189, 248, 0.4);
+            font-weight: 700 !important;
+        }
+        
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: rgba(11, 30, 54, 0.7);
+            border-radius: 10px;
+            padding: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #0284C7 !important;
+            color: #FFFFFF !important;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
-# 4. 網頁標題
-st.title("⚓️ 全球港口績效動態儀表板")
-st.write("運用 Python 進行 UNCTAD 航運大數據清洗，結合智慧逆境偵測與決策商務輔助系統。")
+# 🌍 國家/經濟體中文化對照表
+COUNTRY_MAPPING = {
+    'Philippines': '菲律賓 (Philippines)',
+    'Türkiye': '土耳其 (Türkiye)',
+    'Italy': '義大利 (Italy)',
+    'Indonesia': '印尼 (Indonesia)',
+    'France': '法國 (France)',
+    'United Kingdom': '英國 (United Kingdom)',
+    'Russian Federation': '俄羅斯 (Russian Federation)',
+    'Korea, Republic of': '南韓 (South Korea)',
+    'China': '中國 (China)',
+    'Croatia': '克羅埃西亞 (Croatia)',
+    'Australia': '澳洲 (Australia)',
+    'United States of America': '美國 (United States)',
+    'Germany': '德國 (Germany)',
+    'Spain': '西班牙 (Spain)',
+    'Japan': '日本 (Japan)',
+    'Singapore': '新加坡 (Singapore)',
+    'Malaysia': '馬來西亞 (Malaysia)',
+    'Viet Nam': '越南 (Vietnam)',
+    'Thailand': '泰國 (Thailand)',
+    'India': '印度 (India)',
+    'Brazil': '巴西 (Brazil)',
+    'Canada': '加拿大 (Canada)',
+    'Netherlands': '荷蘭 (Netherlands)',
+    'Belgium': '比利時 (Belgium)'
+}
 
-# 5. 側邊欄控制元件 (Sidebar Filter)
-st.sidebar.header("🧭 數據觀測控制台")
-available_periods = sorted(df_clean['Period Label'].unique())
-selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", available_periods, index=len(available_periods)-1)
+# 🚢 船舶類型中文化對照
+VESSEL_ZH_MAPPING = {
+    'All ships': '所有船型 (All ships)',
+    'Liquid bulk carriers': '液體散貨船 (Liquid bulk)',
+    'Dry bulk carriers': '乾散貨船 (Dry bulk)',
+    'Dry breakbulk carriers': '件雜貨船 (Dry breakbulk)',
+    'Liquefied petroleum gas carriers': '液化石油氣船 (LPG)',
+    'Liquefied natural gas carriers': '液化天然氣船 (LNG)',
+    'Container ships': '貨櫃船 (Container)',
+    'Passenger ships': '客船 (Passenger)',
+    'Roll-on/roll-off ships': '滾裝船 (Ro-Ro)'
+}
 
-available_ships = sorted(df_clean['CommercialMarket Label'].unique())
-selected_ships = st.sidebar.multiselect("選擇觀測船舶類型", available_ships, default=available_ships[:2])
+# 🎨 顏色綁定字典
+COLOR_MAP = {
+    '所有船型 (All ships)': '#7DD3FC',               
+    '液體散貨船 (Liquid bulk)': '#FCD34D',              
+    '乾散貨船 (Dry bulk)': '#38BDF8',                 
+    '件雜貨船 (Dry breakbulk)': '#FB923C',            
+    '液化石油氣船 (LPG)': '#F472B6',                  
+    '液化天然氣船 (LNG)': '#C084FC',                  
+    '貨櫃船 (Container)': '#6EE7B7',                 
+    '客船 (Passenger)': '#94A3B8',                  
+    '滾裝船 (Ro-Ro)': '#FCA5A5'                      
+}
 
-# 根據篩選條件切出乾淨資料流
-filtered_df = df_clean[
-    (df_clean['Period Label'] == selected_period) & 
-    (df_clean['CommercialMarket Label'].isin(selected_ships))
-]
+def load_and_clean_real_data():
+    file_name = "US_PortCalls_S.csv"
+    try:
+        df = pd.read_csv(file_name, encoding='utf-8-sig')
+    except Exception as e:
+        st.error(f"❌ 無法讀取 CSV 檔案：{e}")
+        return pd.DataFrame()
 
-# ==============================================================================
-# 🔥 新功能一：頂端核心 KPI 快報大卡片 (Metric Cards)
-# ==============================================================================
-st.markdown("### 📊 當前篩選全域 KPI 快報")
-if not filtered_df.empty:
-    global_avg = filtered_df['Median time in port (days)'].mean()
+    if df.empty:
+        return pd.DataFrame()
+
+    df.columns = df.columns.str.strip()
+    new_df = pd.DataFrame()
     
-    # 計算效率最好與最差的國家
-    country_grouped = filtered_df.groupby('Economy Label')['Median time in port (days)'].mean()
-    worst_country = country_grouped.idxmax()
-    worst_val = country_grouped.max()
-    best_country = country_grouped.idxmin()
-    best_val = country_grouped.min()
-    
-    # 利用 HTML 渲染出具備深海科技感的發光卡片
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f'<div class="metric-card"><div>🌊 全球平均在港時間</div><div class="metric-val">{global_avg:.2f} 天</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-card"><div>🟢 最佳轉運效率國</div><div class="metric-val" style="color:#22C55E;">{best_country} ({best_val:.1f}天)</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="metric-card"><div>🚨 塞港最高風險警示</div><div class="metric-val" style="color:#EF4444;">{worst_country} ({worst_val:.1f}天)</div></div>', unsafe_allow_html=True)
-else:
-    st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
-
-# ==============================================================================
-# 🔥 新功能二：智慧異常偵測與自動文字摘要 (AI Insights)
-# ==============================================================================
-if not filtered_df.empty:
-    st.markdown("""<br>""", unsafe_allow_html=True)
-    with st.container():
-        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-        st.markdown(f"#### 💡 系統智慧觀測分析提示 ({selected_period})")
+    try:
+        new_df['period'] = df['Period'].astype(str).str.strip()
+        new_df['period_label'] = df['Period Label'].astype(str).str.strip()
         
-        # 判斷邏輯：如果最高在港天數大於全球平均的 1.5 倍，就定義為結構性瓶頸異常
-        if worst_val > (global_avg * 1.5):
-            insight_text = f"系統自動偵測到 **{worst_country}** 在目前選定的船舶類型中，港口停泊時間中位數高達 **{worst_val:.1f} 天**，" \
-                           f"已超過全球平均線（{global_avg:.2f}天）的 {worst_val/global_avg:.1f} 倍！" \
-                           f"這顯示該國存在顯著的結構性裝卸瓶頸、硬體老舊或海關清關延宕。建議跨國航商在規劃此航線時，應將轉運時間預算調高，以進行策略性避險。"
+        raw_economy = df['Economy Label'].astype(str).str.strip()
+        raw_vessel = df['CommercialMarket Label'].astype(str).str.strip()
+        
+        new_df['economy_label'] = raw_economy.map(COUNTRY_MAPPING).fillna(raw_economy)
+        new_df['vessel_type'] = raw_vessel.map(VESSEL_ZH_MAPPING).fillna(raw_vessel)
+        
+        s_time = df['Median time in port (days)'].astype(str).str.replace('"', '').str.strip()
+        s_time = s_time.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
+        new_df['median_time_in_port'] = pd.to_numeric(s_time, errors='coerce')
+        
+        gt_cols = [c for c in df.columns if "size" in c.lower() or "gt" in c.lower()]
+        if gt_cols:
+            s_gt = df[gt_cols[0]].astype(str).str.replace('"', '').str.strip()
+            s_gt = s_gt.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
+            new_df['avg_size_GT'] = pd.to_numeric(s_gt, errors='coerce')
         else:
-            insight_text = f"當前觀測期間全球各主要經濟體港口效能分佈較為平穩。全球平均週轉天數維持在 **{global_avg:.2f} 天**，" \
-                           f"並未偵測到極端的離群塞港瓶頸案例，全球供應鏈韌性表現良好。"
-                           
-        st.write(insight_text)
-        st.markdown('</div>', unsafe_allow_html=True)
+            new_df['avg_size_GT'] = 0
+            
+    except Exception as e:
+        st.error(f"❌ 欄位解析與清洗失敗: {e}")
+        return pd.DataFrame()
 
-# 6. 主要圖表呈現區 (Plotly 視覺化)
-st.markdown("### 📈 數據可視化交叉解析")
-tab1, tab2 = st.tabs(["各經濟體效能排行長條圖", "船舶類型機率分佈箱線圖"])
+    new_df = new_df[~new_df['period'].str.contains('period', case=False, na=False)]
+    new_df = new_df[~new_df['economy_label'].str.contains('World|total|economies', case=False, na=False)]
+    new_df = new_df.dropna(subset=['median_time_in_port']).reset_index(drop=True)
+    
+    return new_df
 
-with tab1:
-    if not filtered_df.empty:
-        # 只取前 12 大觀測國家，避免圖表過度擁擠
-        top12_df = filtered_df.groupby('Economy Label').filter(lambda x: x['Median time in port (days)'].mean() > 0).head(40)
-        
-        fig_bar = px.bar(
-            top12_df, 
-            x='Economy Label', 
-            y='Median time in port (days)',
-            color='CommercialMarket Label',
-            barmode='group',
-            title=f"各經濟體港口停泊時間對比 ({selected_period})",
-            template="plotly_dark"
-        )
-        # 美化 Plotly 圖表背景，完美契合你的深海風網頁
-        fig_bar.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color="#E2E8F0")
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-with tab2:
-    if not filtered_df.empty:
-        fig_box = px.box(
-            filtered_df,
-            x='CommercialMarket Label',
-            y='Median time in port (days)',
-            color='CommercialMarket Label',
-            title="各船舶類型在港時間機率分佈 (解讀離散硬體硬實力)",
-            template="plotly_dark"
-        )
-        fig_box.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color="#E2E8F0")
-        )
-        st.plotly_chart(fig_box, use_container_width=True)
+df_cleaned = load_and_clean_real_data()
 
 # ==============================================================================
-# 🔥 新功能三：商務跨境報告一鍵下載 CSV (Data Export)
+# 🎛️ 前端網頁介面渲染
 # ==============================================================================
-if not filtered_df.empty:
-    st.markdown("---")
-    st.markdown("### 📥 跨境物流決策報告匯出")
-    st.write("您可以將目前篩選、清洗後的客製化數據下載為標準 CSV 報表，直接接入公司內部的 Excel 或 BI 工具中進行跨部門協作。")
+# 🌊 1. 頂部密集水花泡泡群
+st.markdown("""
+    <div class="ocean-splash-container">
+        <div class="splash-bubble b1"></div><div class="splash-bubble b2"></div>
+        <div class="splash-bubble b3"></div><div class="splash-bubble b4"></div>
+        <div class="splash-bubble b5"></div><div class="splash-bubble b6"></div>
+        <div class="splash-bubble b7"></div><div class="splash-bubble b8"></div>
+        <div class="splash-bubble b9"></div><div class="splash-bubble b10"></div>
+    </div>
+""", unsafe_allow_html=True)
+
+st.title("⚓️ 全球海事港口績效動態儀表板")
+st.caption("🌊 *基於 UNCTAD 全球航運大數據，動態追蹤全球主要經濟體之港口週轉時效與運力分佈*")
+
+if df_cleaned.empty:
+    st.error("⚠️ 資料集清洗後為空。")
+else:
+    st.sidebar.markdown("## ☸️ 數據篩選中心")
+    st.sidebar.write("---")
+
+    selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", sorted(list(df_cleaned['period'].unique())), index=0)
+    period_df = df_cleaned[df_cleaned['period'] == selected_period]
+
+    all_vessels = sorted(list(period_df['vessel_type'].unique()))
+    selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
+    max_countries = st.sidebar.slider("顯示國家數量", min_value=5, max_value=30, value=12)
+
+    filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
+    if filtered_df.empty:
+        filtered_df = period_df
+
+    st.markdown(f"🚩 **當前分析期間：** `{selected_period}`")
+    st.write("---")
+
+    # 📊 第一層：長條圖
+    st.header("📊 各經濟體港口停泊時間對比")
     
-    # 轉換資料流為 CSV 編碼
-    csv_data = filtered_df.to_csv(index=False).encode('utf-8')
-    
-    st.download_button(
-        label="📥 一鍵導出當前篩選數據 (CSV 格式)",
-        data=csv_data,
-        file_name=f'Port_Performance_Extract_{selected_period}.csv',
-        mime='text/csv'
+    top_countries = (
+        filtered_df.groupby('economy_label')['median_time_in_port']
+        .mean()
+        .sort_values(ascending=False)
+        .head(max_countries)
+        .index.tolist()
     )
+    
+    plot_df = filtered_df[filtered_df['economy_label'].isin(top_countries)]
+    plot_df = plot_df.sort_values(by='median_time_in_port', ascending=False)
+    
+    fig_bar = px.bar(
+        plot_df,
+        x='economy_label',
+        y='median_time_in_port',
+        color='vessel_type',
+        barmode='group',
+        title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
+        labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
+        color_discrete_map=COLOR_MAP
+    )
+    
+    fig_bar.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#E2E8F0'),
+        xaxis=dict(showspikes=False, tickangle=-45, gridcolor='rgba(255,255,255,0.02)'),
+        yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), 
+        height=550
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.write("---")
+
+    # 📊 第二層：進階統計箱線圖
+    st.header("🔬 航運大數據分佈：船舶類型與核心指標")
+    tab1, tab2 = st.tabs(["⏳ 船舶在港停泊天數分佈 (Days)", "🚢 航行船舶平均總噸位分佈 (GT)"])
+
+    with tab1:
+        fig_box1 = px.box(
+            filtered_df,
+            x='vessel_type',
+            y='median_time_in_port',
+            color='vessel_type',
+            title="不同船舶類型的港口停泊時間機率分佈情況",
+            labels={'vessel_type': '船舶類型', 'median_time_in_port': '在港時間 (天)'},
+            points="all",
+            color_discrete_map=COLOR_MAP
+        )
+        fig_box1.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#E2E8F0'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.02)'),
+            yaxis=dict(gridcolor='rgba(56, 189, 248, 0.1)'),
+            height=500, 
+            showlegend=False
+        )
+        st.plotly_chart(fig_box1, use_container_width=True)
+
+    with tab2:
+        if 'avg_size_GT' in filtered_df.columns and filtered_df['avg_size_GT'].sum() > 0:
+            fig_box2 = px.box(
+                filtered_df,
+                x='vessel_type',
+                y='avg_size_GT',
+                color='vessel_type',
+                title="不同船舶類型的平均總噸位大小 (GT) 分佈情況",
+                labels={'vessel_type': '船舶類型', 'avg_size_GT': '平均總噸位 (GT)'},
+                points="all",
+                color_discrete_map=COLOR_MAP
+            )
+            fig_box2.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#E2E8F0'),
+                xaxis=dict(gridcolor='rgba(255,255,255,0.02)'),
+                yaxis=dict(gridcolor='rgba(56, 189, 248, 0.1)'),
+                height=500, 
+                showlegend=False
+            )
+            st.plotly_chart(fig_box2, use_container_width=True)
+        else:
+            st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
+
+    with st.expander("🔍 查看目前篩選的原始資料摘要"):
+        st.dataframe(filtered_df)
+
+    # 🌿 🐟 2. 底部「搖曳海草與悠游小魚」
+    st.markdown("""
+        <div class="sea-floor-aquarium">
+            <div class="seaweed sw1"></div><div class="seaweed sw2"></div><div class="seaweed sw3"></div>
+            <div class="seaweed sw4"></div><div class="seaweed sw5"></div>
+            <div class="seaweed sw6"></div><div class="seaweed sw7"></div><div class="seaweed sw8"></div>
+            <div class="aquarium-fish f1">🐟</div>
+            <div class="aquarium-fish f2">🐠</div>
+            <div class="aquarium-fish f3">🐡</div>
+        </div>
+    """, unsafe_allow_html=True)
