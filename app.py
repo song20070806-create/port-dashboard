@@ -202,7 +202,7 @@ COUNTRY_MAPPING = {
     'Greece': '希臘(Greece)',
     'Norway': '挪威(Norway)',
     'Sweden': '瑞典(Sweden)',
-    'Netherlands': '荷蘭(Netherlands)'
+    'Netherlands(Kindom of the)': '荷蘭(Netherlands)'
 }
 
 # 🚢 船舶類型中文化對照
