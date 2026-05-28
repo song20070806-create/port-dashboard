@@ -197,7 +197,12 @@ COUNTRY_MAPPING = {
     'Brazil': '巴西 (Brazil)',
     'Canada': '加拿大 (Canada)',
     'Netherlands': '荷蘭 (Netherlands)',
-    'Belgium': '比利時 (Belgium)'
+    'Belgium': '比利時 (Belgium)',
+    'Denmark': '丹麥 (Denmark)',
+    'Greece': '希臘(Greece)',
+    'Norway': '挪威(Norway)',
+    'Sweden': '瑞典(Sweden)',
+    'Netherlands': '荷蘭(Netherlands)'
 }
 
 # 🚢 船舶類型中文化對照
