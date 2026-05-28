@@ -3,13 +3,33 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# 設定網頁基本組態
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
+
+# 🚢 建立船舶代號與中英文名稱的對照表 (對應你 CSV 裡的數字)
+VESSEL_MAPPING = {
+    '1.0': 'All ships (所有船型)',
+    '1': 'All ships (所有船型)',
+    '2.0': 'Liquid bulk carriers (液體散貨船)',
+    '2': 'Liquid bulk carriers (液體散貨船)',
+    '4.0': 'Dry bulk carriers (乾散貨船)',
+    '4': 'Dry bulk carriers (乾散貨船)',
+    '5.0': 'Dry breakbulk carriers (件雜貨船)',
+    '5': 'Dry breakbulk carriers (件雜貨船)',
+    '7.0': 'Liquefied petroleum gas carriers (液化石油氣船)',
+    '7': 'Liquefied petroleum gas carriers (液化石油氣船)',
+    '8.0': 'Liquefied natural gas carriers (液化天然氣船)',
+    '8': 'Liquefied natural gas carriers (液化天然氣船)',
+    '11.0': 'Container ships (貨櫃船)',
+    '11': 'Container ships (貨櫃船)',
+    '12.0': 'Passenger ships (客船)',
+    '12': 'Passenger ships (客船)',
+    '13.0': 'Roll-on/roll-off ships (滾裝船)',
+    '13': 'Roll-on/roll-off ships (滾裝船)'
+}
 
 def load_and_clean_real_data():
     file_name = "US_PortCalls_S.csv"
     try:
-        # 讀取 CSV
         df = pd.read_csv(file_name, encoding='utf-8-sig')
     except Exception as e:
         st.error(f"❌ 無法讀取 CSV 檔案：{e}")
@@ -18,47 +38,45 @@ def load_and_clean_real_data():
     if df.empty:
         return pd.DataFrame()
 
-    # 拔除所有欄位名稱的前後空格
     df.columns = df.columns.str.strip()
-    
     new_df = pd.DataFrame()
     
-    # 🎯 根據 debug 畫面呈現的精準欄位名稱進行抓取
     try:
         new_df['period'] = df['Period'].astype(str).str.strip()
         new_df['period_label'] = df['Period Label'].astype(str).str.strip()
         new_df['economy_label'] = df['Economy Label'].astype(str).str.strip()
-        new_df['vessel_type'] = df['CommercialMarket Label'].astype(str).str.strip()
         
-        # 處理數值欄位 (港口停泊時間)
+        # 🎯 讀取原始的船舶代號（去掉小數點與空白）
+        raw_vessel = df['CommercialMarket Label'].astype(str).str.strip()
+        
+        # 🎯 核心修復：如果代號在對照表裡，就換成漂亮的文字；不在就保留原本的數字
+        new_df['vessel_type'] = raw_vessel.map(VESSEL_MAPPING).fillna(raw_vessel)
+        
+        # 處理停泊時間數值
         s_time = df['Median time in port (days)'].astype(str).str.replace('"', '').str.strip()
         s_time = s_time.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
         new_df['median_time_in_port'] = pd.to_numeric(s_time, errors='coerce')
         
-        # 處理數值欄位 (船舶平均總噸位 GT)
-        # 備註：若您 CSV 後方有 Average size GT 相關欄位，此處採自動搜字串或保底位置抓取
+        # 處理船舶總噸位 (GT)
         gt_cols = [c for c in df.columns if "size" in c.lower() or "gt" in c.lower()]
         if gt_cols:
             s_gt = df[gt_cols[0]].astype(str).str.replace('"', '').str.strip()
             s_gt = s_gt.replace(["Not available or not separately reported", "nan", "NaN", "null", ""], np.nan)
             new_df['avg_size_GT'] = pd.to_numeric(s_gt, errors='coerce')
         else:
-            new_df['avg_size_GT'] = 0  # 若無則給予保底 0
+            new_df['avg_size_GT'] = 0
             
     except Exception as e:
-        st.error(f"❌ 欄位對齊失敗，請檢查名稱是否相符。錯誤: {e}")
+        st.error(f"❌ 欄位解析失敗: {e}")
         return pd.DataFrame()
 
-    # 🛑 核心過濾：剔除重複的標題列、空值，以及「World」這個總計項（只留個別國家）
+    # 🛑 過濾雜訊與 World 總計
     new_df = new_df[~new_df['period'].str.contains('period', case=False, na=False)]
     new_df = new_df[~new_df['economy_label'].str.contains('World|Economy', case=False, na=False)]
-    
-    # 刪除時間為空值的列
     new_df = new_df.dropna(subset=['median_time_in_port']).reset_index(drop=True)
     
     return new_df
 
-# 強制每次載入重新讀取
 df_cleaned = load_and_clean_real_data()
 
 # ==============================================================================
@@ -67,54 +85,61 @@ df_cleaned = load_and_clean_real_data()
 st.title("⚓️ 全球海事港口績效動態儀表板")
 
 if df_cleaned.empty:
-    st.error("⚠️ 資料集清洗後為空。請確認 CSV 是否正確過濾。")
+    st.error("⚠️ 資料集清洗後為空。")
 else:
     st.sidebar.header("📊 數據篩選中心")
 
-    # 1. 選擇報告期間 (使用 Period 欄位如 2018S01)
+    # 1. 選擇報告期間
     all_periods = sorted(list(df_cleaned['period'].unique()))
     selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=0)
     
     period_df = df_cleaned[df_cleaned['period'] == selected_period]
 
-    # 2. 選擇船舶類型
+    # 2. 選擇船舶類型 (這裡會呈現漂亮的人類文字，不再是 14.0 這種冷冰冰的數字了！)
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
-    selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
+    
+    # 預設幫使用者勾選前 3 個熱門船型，避免一次全部塞進去讓圖表爆炸
+    default_selection = all_vessels[:3] if len(all_vessels) >= 3 else all_vessels
+    selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=default_selection)
 
     # 3. 顯示國家數量排行
-    max_countries = st.sidebar.slider("顯示國家數量 (依停泊時間排行)", min_value=5, max_value=40, value=15)
+    max_countries = st.sidebar.slider("顯示國家數量", min_value=5, max_value=30, value=12)
 
-    # 最終過濾後的資料
+    # 篩選最終資料
     filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
 
-    # 防止使用者把船型全部取消勾選導致崩潰的保底機制
     if filtered_df.empty:
         filtered_df = period_df
 
     st.markdown(f"**當前分析期間： `{selected_period}`**")
     st.write("---")
 
-    # 📊 第一層：各經濟體港口停泊時間對比長條圖
+    # 📊 各經濟體港口停泊時間對比
     st.header("📊 各經濟體港口停泊時間對比")
     plot_df = filtered_df.sort_values(by='median_time_in_port', ascending=False).head(max_countries)
     
+    # 畫出真正乾淨的長條圖
     fig_bar = px.bar(
         plot_df,
         x='economy_label',
         y='median_time_in_port',
         color='vessel_type',
         barmode='group',
-        title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
+        title="各經濟體船舶在港中位數時間排行",
         labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
         template="plotly_dark",
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
+    
+    # 徹底關掉滑鼠移過去時的藍色十字準星對齊線
+    fig_bar.update_xaxis(showspikes=False)
+    fig_bar.update_yaxis(showspikes=False)
     fig_bar.update_layout(xaxis_tickangle=-45, height=550)
     st.plotly_chart(fig_bar, use_container_width=True)
 
     st.write("---")
 
-    # 📊 第二層：統計箱線圖 (Boxplot)
+    # 📊 第二層：進階統計箱線圖 (Boxplot)
     st.header("📊 進階統計：船舶類型與核心指標分佈")
     tab1, tab2 = st.tabs(["⏳ 在港停泊時間分佈", "🚢 船舶平均總噸位分佈"])
 
@@ -147,8 +172,7 @@ else:
             fig_box2.update_layout(height=500, showlegend=False)
             st.plotly_chart(fig_box2, use_container_width=True)
         else:
-            st.info("ℹ️ 當前資料集未包含有效的總噸位 (GT) 數據欄位。")
+            st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
 
-    # 數據摘要查看
     with st.expander("🔍 查看目前篩選的原始資料摘要"):
         st.dataframe(filtered_df)
