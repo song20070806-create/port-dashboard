@@ -282,8 +282,8 @@ if not filtered_df.empty:
         st.markdown(f'<div class="metric-card"><div>🟢 最佳轉運效率國</div><div class="metric-val" style="color:#22C55E;">{best_country} ({best_val:.1f}天)</div></div>', unsafe_allow_html=True)
     with c3:
         st.markdown(f'<div class="metric-card"><div>🚨 塞港最高風險警示</div><div class="metric-val" style="color:#EF4444;">{worst_country} ({worst_val:.1f}天)</div></div>', unsafe_allow_html=True)
-else:
-    st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
+    else:
+        st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
 
 if df_cleaned.empty:
     st.error("⚠️ 資料集清洗後為空。")
