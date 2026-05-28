@@ -7,7 +7,7 @@ import plotly.express as px
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
 # ==============================================================================
-# 🎯 核心功能：精準欄位鎖定與徹底防空值安全版
+# 🎯 核心功能：地毯式特徵強行對齊法（徹底根除 KeyError: 'period'）
 # ==============================================================================
 @st.cache_data
 def load_and_clean_data():
@@ -21,47 +21,64 @@ def load_and_clean_data():
     # 剃除未命名的流水號欄位
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # 建立乾淨的 DataFrame
-    new_df = pd.DataFrame()
+    # 建立全新的 DataFrame，這三個欄位名字一定要寫死，後面才不會 KeyError
+    new_df = pd.DataFrame(columns=['economy_label', 'vessel_type', 'period'])
     
-    # 1. 鎖定文字欄位
-    new_df['economy_label'] = df.iloc[:, 0].astype(str).str.strip()  # 第 1 欄必定是國家
-    new_df['vessel_type'] = df.iloc[:, 1].astype(str).str.strip()   # 第 2 欄必定是船型
-    
-    # 🔥 關鍵修復：尋找 Period 欄位（優先找名字有 period 的，找不到就固定抓第 9 欄）
-    period_cols = [c for c in df.columns if "period" in c.lower()]
-    if period_cols:
-        new_df['period'] = df[period_cols[0]].astype(str).str.strip()
-    elif df.shape[1] >= 9:
-        new_df['period'] = df.iloc[:, 8].astype(str).str.strip()     # 索引 8 代表第 9 欄
-    else:
-        new_df['period'] = df.iloc[:, -1].astype(str).str.strip()
+    # 1. 地毯式搜索時間欄位 (Period)
+    found_period = False
+    for col in df.columns:
+        if "period" in col.lower() or "year" in col.lower() or "time/label" in col.lower():
+            new_df['period'] = df[col].astype(str).str.strip()
+            found_period = True
+            break
+    if not found_period: # 保底：如果都找不到，強行拿第 9 欄（索引 8）
+        new_df['period'] = df.iloc[:, 8].astype(str).str.strip() if df.shape[1] >= 9 else df.iloc[:, -1].astype(str).str.strip()
 
-    # 2. 鎖定六大核心數值欄位（固定從第 3 欄抓到第 8 欄）
+    # 2. 地毯式搜索船舶類型 (Vessel Type)
+    found_vessel = False
+    for col in df.columns:
+        if "vessel" in col.lower() or "ship" in col.lower():
+            new_df['vessel_type'] = df[col].astype(str).str.strip()
+            found_vessel = True
+            break
+    if not found_vessel: # 保底：拿第 2 欄
+        new_df['vessel_type'] = df.iloc[:, 1].astype(str).str.strip()
+
+    # 3. 地毯式搜索國家欄位 (Economy)
+    found_economy = False
+    for col in df.columns:
+        if "economy" in col.lower() or "country" in col.lower() or "label" in col.lower() and col != df.columns[1]:
+            new_df['economy_label'] = df[col].astype(str).str.strip()
+            found_economy = True
+            break
+    if not found_economy: # 保底：拿第 1 欄
+        new_df['economy_label'] = df.iloc[:, 0].astype(str).str.strip()
+
+    # 4. 強行對齊並抓取六大核心數值
     target_numeric_names = [
         'avg_vessel_age', 'median_time_in_port', 'avg_size_GT', 
         'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT'
     ]
     
     for i, target_name in enumerate(target_numeric_names):
-        col_idx = 2 + i  # 從索引 2 (第 3 欄) 開始
+        col_idx = 2 + i  # 從數值列起始位置開始抓
         if col_idx < df.shape[1]:
             s = df.iloc[:, col_idx].astype(str).replace("Not available or not separately reported", pd.NA)
             new_df[target_name] = pd.to_numeric(s, errors='coerce')
         else:
             new_df[target_name] = np.nan
 
-    # 3. 數值缺失值中位數填補
+    # 5. 數值缺失值中位數填補（對齊 Kaggle 精神）
     for col in target_numeric_names:
         median_val = new_df[col].median()
         if pd.isna(median_val):
             median_val = 0.0
         new_df[col] = new_df[col].fillna(median_val)
         
-    # 文字標籤清洗與美化
+    # 文字標籤美化
     new_df['vessel_type'] = new_df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
     
-    # 過濾掉可能不小心抓到的欄位標題行雜訊
+    # 徹底清除第一列標題行可能帶進來的髒資料
     new_df = new_df[~new_df['period'].str.contains('Period', case=False, na=False)]
     new_df = new_df[~new_df['economy_label'].str.contains('Economy', case=False, na=False)]
     
@@ -72,8 +89,8 @@ df_cleaned = load_and_clean_data()
 # ==============================================================================
 # 🎛️ 前端網頁渲染與側邊欄
 # ==============================================================================
-if df_cleaned.empty:
-    st.error("⚠️ 讀取後的資料集為空，無法渲染儀表板。")
+if df_cleaned.empty or 'period' not in df_cleaned.columns:
+    st.error("⚠️ 資料表欄位對齊失敗，請確認 CSV 檔案結構。")
 else:
     st.sidebar.header("📊 數據篩選中心")
 
