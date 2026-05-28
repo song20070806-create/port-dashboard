@@ -4,7 +4,7 @@ import numpy as np
 import plotly.express as px
 
 # 1. 網頁基本組態設定
-st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
+st.set_page_config(page_title="全球港口績效儀表板", layout="wide")
 
 # 🌍 國家/經濟體中文化對照表（涵蓋圖表常客與全球主要海事國家）
 COUNTRY_MAPPING = {
