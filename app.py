@@ -7,7 +7,7 @@ import plotly.express as px
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
 # ==============================================================================
-# 🎯 核心功能：超強健資料載入與清洗（防崩潰、防空值安全版）
+# 🎯 核心功能：精準欄位鎖定與徹底防空值安全版
 # ==============================================================================
 @st.cache_data
 def load_and_clean_data():
@@ -24,44 +24,44 @@ def load_and_clean_data():
     # 建立乾淨的 DataFrame
     new_df = pd.DataFrame()
     
-    # 用最保險的 iloc 位置分配三大文字維度
-    if df.shape[1] >= 2:
-        new_df['economy_label'] = df.iloc[:, 0].astype(str).str.strip()
-        new_df['vessel_type'] = df.iloc[:, 1].astype(str).str.strip()
+    # 1. 鎖定文字欄位
+    new_df['economy_label'] = df.iloc[:, 0].astype(str).str.strip()  # 第 1 欄必定是國家
+    new_df['vessel_type'] = df.iloc[:, 1].astype(str).str.strip()   # 第 2 欄必定是船型
+    
+    # 🔥 關鍵修復：尋找 Period 欄位（優先找名字有 period 的，找不到就固定抓第 9 欄）
+    period_cols = [c for c in df.columns if "period" in c.lower()]
+    if period_cols:
+        new_df['period'] = df[period_cols[0]].astype(str).str.strip()
+    elif df.shape[1] >= 9:
+        new_df['period'] = df.iloc[:, 8].astype(str).str.strip()     # 索引 8 代表第 9 欄
     else:
-        st.error("❌ CSV 檔案欄位數量不足，請確認檔案是否正確。")
-        return pd.DataFrame()
+        new_df['period'] = df.iloc[:, -1].astype(str).str.strip()
 
-    # 處理最後一欄作為報告期間
-    new_df['period'] = df.iloc[:, -1].astype(str).str.strip()
-
-    # 定義六大核心數值欄位名稱
+    # 2. 鎖定六大核心數值欄位（固定從第 3 欄抓到第 8 欄）
     target_numeric_names = [
         'avg_vessel_age', 'median_time_in_port', 'avg_size_GT', 
         'avg_cargo_capacity_DWT', 'max_size_GT', 'max_cargo_capacity_DWT'
     ]
     
-    # 依序抓取中間的數值欄位
     for i, target_name in enumerate(target_numeric_names):
-        col_idx = 2 + i
+        col_idx = 2 + i  # 從索引 2 (第 3 欄) 開始
         if col_idx < df.shape[1]:
             s = df.iloc[:, col_idx].astype(str).replace("Not available or not separately reported", pd.NA)
             new_df[target_name] = pd.to_numeric(s, errors='coerce')
         else:
             new_df[target_name] = np.nan
 
-    # ⚡ 核心修復：為數值欄位提供最安全的缺失值填補，確保絕不出現 NaN 或空表格
+    # 3. 數值缺失值中位數填補
     for col in target_numeric_names:
         median_val = new_df[col].median()
-        if pd.isna(median_val) or median_val == 0:
-            # 如果沒有有效中位數，給予安全基礎值，確保圖表畫得出來
-            median_val = 1.0 if 'time' in col or 'age' in col else 100.0
+        if pd.isna(median_val):
+            median_val = 0.0
         new_df[col] = new_df[col].fillna(median_val)
         
-    # 文字標籤親民化美化
+    # 文字標籤清洗與美化
     new_df['vessel_type'] = new_df['vessel_type'].replace({'All ships': 'All_Vessel_Types'})
     
-    # 過濾掉可能不小心抓到的欄位標題行
+    # 過濾掉可能不小心抓到的欄位標題行雜訊
     new_df = new_df[~new_df['period'].str.contains('Period', case=False, na=False)]
     new_df = new_df[~new_df['economy_label'].str.contains('Economy', case=False, na=False)]
     
@@ -82,7 +82,7 @@ else:
     if all_periods:
         selected_period = st.sidebar.selectbox("選擇報告期間 (Period)", all_periods, index=len(all_periods)-1)
     else:
-        selected_period = df_cleaned['period'].iloc[0] if not df_cleaned['period'].empty else "Unknown"
+        selected_period = "Unknown"
 
     # 2. 船舶類型篩選器
     all_vessels = sorted(list(df_cleaned['vessel_type'].unique()))
@@ -92,7 +92,7 @@ else:
 
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=default_vessels)
 
-    # 3. 限制畫面顯示的國家數量
+    # 3. 限制顯示的國家數量
     max_countries = st.sidebar.slider("畫面上顯示前幾名效率排行國家", min_value=5, max_value=40, value=15)
 
     # 動態過濾資料
@@ -110,7 +110,6 @@ else:
     st.header("📈 各經濟體港口停泊時間對比")
     
     if not filtered_df.empty:
-        # 排序並切出前 N 個國家
         plot_df = filtered_df.sort_values(by='median_time_in_port', ascending=False).head(max_countries)
         
         try:
@@ -125,11 +124,7 @@ else:
                 template="ggplot2"
             )
             
-            # 設定安全的 Y 軸範圍，避免因為最大值計算錯誤導致崩潰
             max_y = float(plot_df['median_time_in_port'].max()) if not plot_df['median_time_in_port'].empty else 5.0
-            if max_y <= 0:
-                max_y = 5.0
-                
             fig_line.update_layout(
                 xaxis_tickangle=-45, 
                 height=600,
@@ -139,7 +134,7 @@ else:
         except Exception as plot_error:
             st.error(f"❌ 渲染折線圖時發生錯誤: {plot_error}")
     else:
-        st.warning("⚠️ 當前篩選條件下無數據，請在左側勾選「船舶類型」。")
+        st.warning("⚠️ 當前篩選條件下無數據，請在左側側邊欄重新勾選船舶類型。")
 
     st.write("---")
 
