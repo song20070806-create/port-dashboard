@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# 1. 網頁基本組態設定
+# 1. 網頁基本組態設定 (必須在第一行)
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide", page_icon="⚓️")
 
 # 🌊 安全溫和版海洋風 CSS：防止全局衝突變黑
@@ -63,6 +63,31 @@ st.markdown("""
         @keyframes floatBubble {
             0% { transform: translateY(0px) scale(0.95); opacity: 0.5; }
             100% { transform: translateY(-12px) scale(1.08); opacity: 0.85; }
+        }
+
+        /* 💡 補上漏掉的科技感發光大卡片與智慧摘要樣式 */
+        .metric-card {
+            background: rgba(11, 30, 54, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.15);
+            backdrop-filter: blur(5px);
+            margin-bottom: 15px;
+        }
+        .metric-val {
+            font-size: 26px;
+            font-weight: bold;
+            color: #38BDF8;
+            margin-top: 8px;
+        }
+        .insight-box {
+            background: rgba(13, 148, 136, 0.15);
+            border-left: 5px solid #0D9488;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
         }
 
         /* 🌿 🐟 底部「搖曳海草與悠游小魚」生態區 */
@@ -286,104 +311,112 @@ else:
     st.markdown(f"🚩 **當前分析期間：** `{selected_period}`")
     st.write("---")
 
-
+    # ==============================================================================
+    # 📊 核心 KPI 快報大卡片區區（已修正縮排並放入正確的 filtered_df 判斷內）
+    # ==============================================================================
     st.markdown("### 📊 當前篩選全域 KPI 快報")
-if not filtered_df.empty:
-    global_avg = filtered_df['Median time in port (days)'].mean()
-    
-    # 計算效率最好與最差的國家
-    country_grouped = filtered_df.groupby('Economy Label')['Median time in port (days)'].mean()
-    worst_country = country_grouped.idxmax()
-    worst_val = country_grouped.max()
-    best_country = country_grouped.idxmin()
-    best_val = country_grouped.min()
-    
-    # 利用 HTML 渲染出具備深海科技感的發光卡片
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f'<div class="metric-card"><div>🌊 全球平均在港時間</div><div class="metric-val">{global_avg:.2f} 天</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-card"><div>🟢 最佳轉運效率國</div><div class="metric-val" style="color:#22C55E;">{best_country} ({best_val:.1f}天)</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="metric-card"><div>🚨 塞港最高風險警示</div><div class="metric-val" style="color:#EF4444;">{worst_country} ({worst_val:.1f}天)</div></div>', unsafe_allow_html=True)
-else:
-    st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
-    # 📊 第一層：長條圖
-    st.header("📊 各經濟體港口停泊時間對比")
-    
-    top_countries = (
-        filtered_df.groupby('economy_label')['median_time_in_port']
-        .mean()
-        .sort_values(ascending=False)
-        .head(max_countries)
-        .index.tolist()
-    )
-    
-    plot_df = filtered_df[filtered_df['economy_label'].isin(top_countries)]
-    plot_df = plot_df.sort_values(by='median_time_in_port', ascending=False)
-    
-    fig_bar = px.bar(
-        plot_df,
-        x='economy_label',
-        y='median_time_in_port',
-        color='vessel_type',
-        barmode='group',
-        title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
-        labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
-        color_discrete_map=COLOR_MAP
-    )
-    
-    fig_bar.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#E2E8F0'),
-        xaxis=dict(showspikes=False, tickangle=-45, gridcolor='rgba(255,255,255,0.02)'),
-        yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), 
-        height=550
-    )
-    st.plotly_chart(fig_bar, use_container_width=True)
+    if not filtered_df.empty:
+        global_avg = filtered_df['median_time_in_port'].mean()
+        
+        # 修正欄位名稱，根據前面清洗完的欄位應為 'economy_label' 與 'median_time_in_port'
+        country_grouped = filtered_df.groupby('economy_label')['median_time_in_port'].mean()
+        worst_country = country_grouped.idxmax()
+        worst_val = country_grouped.max()
+        best_country = country_grouped.idxmin()
+        best_val = country_grouped.min()
+        
+        # 利用 HTML 渲染出具備深海科技感的發光卡片
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f'<div class="metric-card"><div>🌊 全球平均在港時間</div><div class="metric-val">{global_avg:.2f} 天</div></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="metric-card"><div>🟢 最佳轉運效率國</div><div class="metric-val" style="color:#22C55E;">{best_country} ({best_val:.1f}天)</div></div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown(f'<div class="metric-card"><div>🚨 塞港最高風險警示</div><div class="metric-val" style="color:#EF4444;">{worst_country} ({worst_val:.1f}天)</div></div>', unsafe_allow_html=True)
+            
+        # 💡 自動文字摘要小助手（完美整合！）
+        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
+        st.markdown(f"#### 💡 系統智慧觀測分析提示 ({selected_period})")
+        if worst_val > (global_avg * 1.5):
+            insight_text = f"系統偵測到 **{worst_country}** 目前港口停泊時間中位數高達 **{worst_val:.1f} 天**，已高出全球平均線達 {worst_val/global_avg:.1f} 倍。該國存在顯著的結構性裝卸瓶頸，建議跨國航商規劃此航線時納入策略性避險。"
+        else:
+            insight_text = "當前觀測期間全球主要經濟體之港口效能分佈相對平穩，全球供應鏈韌性表現良好，未偵測到極端離群塞港事件。"
+        st.write(insight_text)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+    else:
+        st.warning("當前篩選條件下無資料，請重新選擇船舶類型。")
 
-    st.write("---")
-
-    # 📊 第二層：進階統計箱線圖
-    st.header("🔬 航運大數據分佈：船舶類型與核心指標")
-    tab1, tab2 = st.tabs(["⏳ 船舶在港停泊天數分佈 (Days)", "🚢 航行船舶平均總噸位分佈 (GT)"])
-
-    with tab1:
-        fig_box1 = px.box(
-            filtered_df,
-            x='vessel_type',
+    # ==============================================================================
+    # 📊 圖表呈現區（已移入正確的縮排層級）
+    # ==============================================================================
+    if not filtered_df.empty:
+        st.header("📊 各經濟體港口停泊時間對比")
+        
+        top_countries = (
+            filtered_df.groupby('economy_label')['median_time_in_port']
+            .mean()
+            .sort_values(ascending=False)
+            .head(max_countries)
+            .index.tolist()
+        )
+        
+        plot_df = filtered_df[filtered_df['economy_label'].isin(top_countries)]
+        plot_df = plot_df.sort_values(by='median_time_in_port', ascending=False)
+        
+        fig_bar = px.bar(
+            plot_df,
+            x='economy_label',
             y='median_time_in_port',
             color='vessel_type',
-            title="不同船舶類型的港口停泊時間機率分佈情況",
-            labels={'vessel_type': '船舶類型', 'median_time_in_port': '在港時間 (天)'},
-            points="all",
+            barmode='group',
+            title=f"各經濟體船舶在港中位數時間排行 (期間: {selected_period})",
+            labels={'economy_label': '經濟體/國家', 'median_time_in_port': '停泊中位數時間 (天)', 'vessel_type': '船舶類型'},
             color_discrete_map=COLOR_MAP
         )
-        fig_box1.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
+        
+        fig_bar.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)',
             font=dict(color='#E2E8F0'),
-            xaxis=dict(gridcolor='rgba(255,255,255,0.02)'),
-            yaxis=dict(gridcolor='rgba(56, 189, 248, 0.1)'),
-            height=500, 
-            showlegend=False
+            xaxis=dict(showspikes=False, tickangle=-45, gridcolor='rgba(255,255,255,0.02)'),
+            yaxis=dict(showspikes=False, gridcolor='rgba(56, 189, 248, 0.1)'), 
+            height=550
         )
-        st.plotly_chart(fig_box1, use_container_width=True)
+        
+        # 📸 設定 Plotly 滑鼠移過去點相機時，下載超高畫質 16:9 簡報用圖檔
+        st.plotly_chart(
+            fig_bar, 
+            use_container_width=True,
+            config={
+                'toImageButtonOptions': {
+                    'format': 'png',
+                    'filename': '港口績效排行長條圖',
+                    'height': 720,
+                    'width': 1280,
+                    'scale': 2
+                }
+            }
+        )
 
-    with tab2:
-        if 'avg_size_GT' in filtered_df.columns and filtered_df['avg_size_GT'].sum() > 0:
-            fig_box2 = px.box(
+        st.write("---")
+
+        # 📊 第二層：進階統計箱線圖
+        st.header("🔬 航運大數據分佈：船舶類型與核心指標")
+        tab1, tab2 = st.tabs(["⏳ 船舶在港停泊天數分佈 (Days)", "🚢 航行船舶平均總噸位分佈 (GT)"])
+
+        with tab1:
+            fig_box1 = px.box(
                 filtered_df,
                 x='vessel_type',
-                y='avg_size_GT',
+                y='median_time_in_port',
                 color='vessel_type',
-                title="不同船舶類型的平均總噸位大小 (GT) 分佈情況",
-                labels={'vessel_type': '船舶類型', 'avg_size_GT': '平均總噸位 (GT)'},
+                title="不同船舶類型的港口停泊時間機率分佈情況",
+                labels={'vessel_type': '船舶類型', 'median_time_in_port': '在港時間 (天)'},
                 points="all",
                 color_discrete_map=COLOR_MAP
             )
-            fig_box2.update_layout(
+            fig_box1.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color='#E2E8F0'),
@@ -392,18 +425,68 @@ else:
                 height=500, 
                 showlegend=False
             )
-            st.plotly_chart(fig_box2, use_container_width=True)
-        else:
-            st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
+            st.plotly_chart(
+                fig_box1, 
+                use_container_width=True,
+                config={
+                    'toImageButtonOptions': {
+                        'format': 'png',
+                        'filename': '船舶在港天數分佈箱線圖',
+                        'height': 720,
+                        'width': 1280,
+                        'scale': 2
+                    }
+                }
+            )
 
-    with st.expander("🔍 查看目前篩選的原始資料摘要"):
-        st.dataframe(filtered_df)
-    st.download_button(
-        label="📥 下載本次篩選數據 (CSV)",
-        data=filtered_df.to_csv(index=False).encode('utf-8-sig'),
-        file_name='Port_Performance_Filtered.csv',
-        mime='text/csv'
-    )
+        with tab2:
+            if 'avg_size_GT' in filtered_df.columns and filtered_df['avg_size_GT'].sum() > 0:
+                fig_box2 = px.box(
+                    filtered_df,
+                    x='vessel_type',
+                    y='avg_size_GT',
+                    color='vessel_type',
+                    title="不同船舶類型的平均總噸位大小 (GT) 分佈情況",
+                    labels={'vessel_type': '船舶類型', 'avg_size_GT': '平均總噸位 (GT)'},
+                    points="all",
+                    color_discrete_map=COLOR_MAP
+                )
+                fig_box2.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#E2E8F0'),
+                    xaxis=dict(gridcolor='rgba(255,255,255,0.02)'),
+                    yaxis=dict(gridcolor='rgba(56, 189, 248, 0.1)'),
+                    height=500, 
+                    showlegend=False
+                )
+                st.plotly_chart(
+                    fig_box2, 
+                    use_container_width=True,
+                    config={
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': '船舶噸位大小分佈箱線圖',
+                            'height': 720,
+                            'width': 1280,
+                            'scale': 2
+                        }
+                    }
+                )
+            else:
+                st.info("ℹ️ 當前資料集未包含有效的總噸位數據。")
+
+        # 資料下載區
+        with st.expander("🔍 查看目前篩選的原始資料摘要"):
+            st.dataframe(filtered_df)
+            
+        st.download_button(
+            label="📥 下載本次篩選數據 (CSV)",
+            data=filtered_df.to_csv(index=False).encode('utf-8-sig'),
+            file_name='Port_Performance_Filtered.csv',
+            mime='text/csv'
+        )
+
     # 🌿 🐟 2. 底部「搖曳海草與悠游小魚」
     st.markdown("""
         <div class="sea-floor-aquarium">
