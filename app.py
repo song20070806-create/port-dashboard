@@ -285,7 +285,8 @@ else:
 
     st.markdown(f"🚩 **當前分析期間：** `{selected_period}`")
     st.write("---")
-
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label="📊 全球平均在港時間", value="1.85 天", delta="-0.12 天 (較上季優化)")
     # 📊 第一層：長條圖
     st.header("📊 各經濟體港口停泊時間對比")
     
