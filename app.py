@@ -6,14 +6,17 @@ import plotly.express as px
 # 1. 網頁基本組態設定
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide", page_icon="⚓️")
 
-# 🌊 注入頂級海洋風（Deep Ocean）與「頂部密集泡泡 + 底部搖曳海草與小魚」特效
+# 🌊 安全溫和版海洋風 CSS：防止全局衝突變黑
 st.markdown("""
     <style>
-        /* 網頁主背景：深海漸層色 */
+        /* 溫和設定主背景，移除不必要的全局文字強制覆蓋 */
         .stApp {
             background: linear-gradient(180deg, #050E1A 0%, #0B1E36 50%, #030812 100%) !important;
+        }
+
+        /* 確保基本文字顏色在深色背景下清晰可見 */
+        .stApp p, .stApp span, .stApp label, .stApp h1, .stApp h2, .stApp h3 {
             color: #E2E8F0 !important;
-            position: relative;
         }
 
         /* 🌊 網頁最頂部「海浪波紋」裝飾條 */
@@ -35,7 +38,7 @@ st.markdown("""
             width: 100%;
             height: 80px;
             overflow: hidden;
-            margin-bottom: -30px;
+            margin-bottom: -10px;
         }
         .splash-bubble {
             position: absolute;
@@ -70,7 +73,7 @@ st.markdown("""
             background: linear-gradient(to top, rgba(3, 8, 18, 0.9) 0%, rgba(11, 30, 54, 0) 100%);
             margin-top: 40px;
             overflow: hidden;
-            border-top: 1px solid rgba(56, 189, 248, 0.05);
+            border-top: 1px solid rgba(56, 189, 248, 0.1);
         }
         
         /* 海草樣式與左右搖曳動畫 */
@@ -101,10 +104,10 @@ st.markdown("""
         /* 游動小魚樣式 */
         .aquarium-fish {
             position: absolute;
-            font-size: 18px;
-            opacity: 0.8;
-            text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
-            animation: swim 12s linear infinite;
+            font-size: 20px;
+            opacity: 0.95;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+            animation: swim 14s linear infinite;
         }
         .f1 { bottom: 45px; animation-duration: 14s; animation-delay: 0s; }
         .f2 { bottom: 20px; animation-duration: 18s; animation-delay: 4s; }
@@ -118,18 +121,17 @@ st.markdown("""
             100% { left: -5%; transform: scaleX(1); }
         }
         
-        /* 側邊欄樣式 */
+        /* 側邊欄樣式優化 */
         [data-testid="stSidebar"] {
             background-color: #030A16 !important;
             border-right: 2px solid #0284C7 !important;
-            box-shadow: 5px 0px 15px rgba(2, 132, 199, 0.1);
         }
         
-        h1, h2, h3 {
+        /* 讓標題顏色獨立發光 */
+        .stApp h1 {
             color: #38BDF8 !important;
-            font-family: 'Helvetica Neue', sans-serif;
-            font-weight: 700 !important;
             text-shadow: 0px 0px 12px rgba(56, 189, 248, 0.4);
+            font-weight: 700 !important;
         }
         
         .stTabs [data-baseweb="tab-list"] {
@@ -138,18 +140,9 @@ st.markdown("""
             padding: 4px;
             border: 1px solid rgba(56, 189, 248, 0.2);
         }
-        .stTabs [data-baseweb="tab"] {
-            color: #94A3B8 !important;
-            border-radius: 6px;
-        }
         .stTabs [aria-selected="true"] {
             background-color: #0284C7 !important;
             color: #FFFFFF !important;
-            font-weight: bold !important;
-        }
-
-        p, span, label {
-            color: #A5F3FC !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -284,15 +277,13 @@ else:
 
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
-    max_countries = st.sidebar.slider("顯示國家數量 (依國家平均停泊時間排行)", min_value=5, max_value=30, value=12)
+    max_countries = st.sidebar.slider("顯示國家數量", min_value=5, max_value=30, value=12)
 
     filtered_df = period_df[period_df['vessel_type'].isin(selected_vessels)]
     if filtered_df.empty:
         filtered_df = period_df
 
-    col_info1, col_info2 = st.columns(2)
-    with col_info1:
-        st.markdown(f"🚩 **當前分析期間：** `{selected_period}`")
+    st.markdown(f"🚩 **當前分析期間：** `{selected_period}`")
     st.write("---")
 
     # 📊 第一層：長條圖
@@ -320,7 +311,6 @@ else:
         color_discrete_map=COLOR_MAP
     )
     
-    # 🌟 這裡修正了錯誤，使用雙向字典同時將 showspikes 設定寫入
     fig_bar.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', 
         plot_bgcolor='rgba(0,0,0,0)',
