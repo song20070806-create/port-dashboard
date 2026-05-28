@@ -6,6 +6,47 @@ import plotly.express as px
 # 1. 網頁基本組態設定
 st.set_page_config(page_title="全球港口績效動態儀表板", layout="wide")
 
+# 🌍 國家/經濟體中文化對照表（涵蓋圖表常客與全球主要海事國家）
+COUNTRY_MAPPING = {
+    'Philippines': '菲律賓 (Philippines)',
+    'Türkiye': '土耳其 (Türkiye)',
+    'Italy': '義大利 (Italy)',
+    'Indonesia': '印尼 (Indonesia)',
+    'France': '法國 (France)',
+    'United Kingdom': '英國 (United Kingdom)',
+    'Russian Federation': '俄羅斯 (Russian Federation)',
+    'Korea, Republic of': '南韓 (South Korea)',
+    'China': '中國 (China)',
+    'Croatia': '克羅埃西亞 (Croatia)',
+    'Australia': '澳洲 (Australia)',
+    'United States of America': '美國 (United States)',
+    'Germany': '德國 (Germany)',
+    'Spain': '西班牙 (Spain)',
+    'Japan': '日本 (Japan)',
+    'Singapore': '新加坡 (Singapore)',
+    'Malaysia': '馬來西亞 (Malaysia)',
+    'Viet Nam': '越南 (Vietnam)',
+    'Thailand': '泰國 (Thailand)',
+    'India': '印度 (India)',
+    'Brazil': '巴西 (Brazil)',
+    'Canada': '加拿大 (Canada)',
+    'Netherlands': '荷蘭 (Netherlands)',
+    'Belgium': '比利時 (Belgium)'
+}
+
+# 🚢 船舶類型中文化對照表
+VESSEL_ZH_MAPPING = {
+    'All ships': '所有船型 (All ships)',
+    'Liquid bulk carriers': '液體散貨船 (Liquid bulk)',
+    'Dry bulk carriers': '乾散貨船 (Dry bulk)',
+    'Dry breakbulk carriers': '件雜貨船 (Dry breakbulk)',
+    'Liquefied petroleum gas carriers': '液化石油氣船 (LPG)',
+    'Liquefied natural gas carriers': '液化天然氣船 (LNG)',
+    'Container ships': '貨櫃船 (Container)',
+    'Passenger ships': '客船 (Passenger)',
+    'Roll-on/roll-off ships': '滾裝船 (Ro-Ro)'
+}
+
 def load_and_clean_real_data():
     file_name = "US_PortCalls_S.csv"
     try:
@@ -24,11 +65,16 @@ def load_and_clean_real_data():
     new_df = pd.DataFrame()
     
     try:
-        # 直接抓取最精準的欄位，不再需要代號轉換字典了！
+        # 直接抓取最精準的原始欄位
         new_df['period'] = df['Period'].astype(str).str.strip()
         new_df['period_label'] = df['Period Label'].astype(str).str.strip()
-        new_df['economy_label'] = df['Economy Label'].astype(str).str.strip()
-        new_df['vessel_type'] = df['CommercialMarket Label'].astype(str).str.strip()
+        
+        raw_economy = df['Economy Label'].astype(str).str.strip()
+        raw_vessel = df['CommercialMarket Label'].astype(str).str.strip()
+        
+        # 🎯 核心中文化轉換邏輯 (.map 搭配 .fillna 保底)
+        new_df['economy_label'] = raw_economy.map(COUNTRY_MAPPING).fillna(raw_economy)
+        new_df['vessel_type'] = raw_vessel.map(VESSEL_ZH_MAPPING).fillna(raw_vessel)
         
         # 安全清洗並轉換「港口停泊時間」為數值型態
         s_time = df['Median time in port (days)'].astype(str).str.replace('"', '').str.strip()
@@ -48,11 +94,9 @@ def load_and_clean_real_data():
         st.error(f"❌ 欄位解析與清洗失敗: {e}")
         return pd.DataFrame()
 
-    # 🛑 修正後的精準過濾：只剔除標題列本身，以及總計項目 "World"
-    # 這樣絕對不會誤傷包含 "carriers" 或其他英文字的正常船型資料！
+    # 🛑 精準過濾：剔除標題列本身，以及總計項目
     new_df = new_df[~new_df['period'].str.contains('period', case=False, na=False)]
-    new_df = new_df[new_df['economy_label'] != 'World']
-    new_df = new_df[~new_df['economy_label'].str.contains('total|economies', case=False, na=False)]
+    new_df = new_df[~new_df['economy_label'].str.contains('World|total|economies', case=False, na=False)]
     
     # 移除時間為空值的無效列
     new_df = new_df.dropna(subset=['median_time_in_port']).reset_index(drop=True)
@@ -62,7 +106,7 @@ def load_and_clean_real_data():
 df_cleaned = load_and_clean_real_data()
 
 # ==============================================================================
-# 🎛️ 前端網頁介面渲染
+# 🎛️ 前端網頁介面渲染 (全面中文化)
 # ==============================================================================
 st.title("⚓️ 全球海事港口績效動態儀表板")
 
@@ -79,8 +123,6 @@ else:
 
     # 2. 選擇船舶類型
     all_vessels = sorted(list(period_df['vessel_type'].unique()))
-    
-    # 預設直接幫使用者勾選「所有看得到的船型」，讓 Liquid bulk carriers 第一時間秀出來！
     selected_vessels = st.sidebar.multiselect("選擇船舶類型", all_vessels, default=all_vessels)
 
     # 3. 顯示國家數量排行滑桿
